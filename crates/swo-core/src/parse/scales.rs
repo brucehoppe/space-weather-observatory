@@ -60,7 +60,7 @@ struct RawG {
 }
 
 /// One domain's entry for one day.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DomainStatus {
     pub domain: ScaleDomain,
     /// Present only when the provider states a level for this day.
@@ -72,7 +72,7 @@ pub struct DomainStatus {
     pub probabilities: Vec<(String, f64)>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ScaleDay {
     /// 0 = current status; 1..3 = forecast days; -1 = the previous day, which
     /// SWPC also publishes.

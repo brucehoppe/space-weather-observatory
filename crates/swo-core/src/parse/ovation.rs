@@ -34,7 +34,7 @@ struct Raw {
 }
 
 /// A parsed OVATION grid, stored densely for fast lookup and rendering.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AuroraGrid {
     pub observation_time: DateTime<Utc>,
     pub forecast_time: DateTime<Utc>,

@@ -109,7 +109,7 @@ struct SourceAssignment {
 }
 
 /// Which satellite was primary for X-rays, as of the newest entry.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct XraySourceAssignment {
     pub effective_from: chrono::DateTime<chrono::Utc>,
     pub primary: String,

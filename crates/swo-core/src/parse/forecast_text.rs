@@ -18,7 +18,7 @@ pub const GEOMAG_URL: &str = "https://services.swpc.noaa.gov/text/3-day-geomag-f
 pub const THREE_DAY_PAGE: &str = "https://www.spaceweather.gov/products/3-day-forecast";
 
 /// One forecast Kp value for one 3-hour UT interval of one day.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct KpForecastCell {
     pub interval_start: DateTime<Utc>,
     pub interval_seconds: i64,
@@ -27,7 +27,7 @@ pub struct KpForecastCell {
     pub noaa_scale: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ThreeDayForecast {
     pub issued_at: DateTime<Utc>,
     /// Days the product actually covers, in order.

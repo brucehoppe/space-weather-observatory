@@ -21,7 +21,8 @@ pub const KP_FORECAST_URL: &str =
 pub const INTERVAL_SECONDS: i64 = 3 * 3600;
 
 /// How the provider characterises a Kp value. These are never merged.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum KpKind {
     /// Derived from reporting observatories after the fact.
     Observed,
@@ -54,7 +55,7 @@ impl KpKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct KpInterval {
     pub observation: Observation,
     pub kind: KpKind,
