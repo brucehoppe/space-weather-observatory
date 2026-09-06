@@ -18,7 +18,7 @@ not a Windows reference machine**; Windows figures are pending.
 | Performance | **Verified on dev machine** | `cargo test --release -p swo-core --test perf -- --nocapture` (7-day, 1-min, 10 080 samples): nearest-sample lookup p95 **0.078 ms**; segments 0.105 ms; min–max downsample 0.272 ms (peak preserved); alert evaluate p95 0.071 ms; serialize week 1.03 MB in 2.8 ms. `npm test` (Node 26): TS nearest p95 **1.07 ms**, segments 1.26 ms. Selection target <100 ms met with large margin. Memory bounded by cache limit (`a_size_limit_trims_oldest_snapshots`). **No Windows measurement.** |
 | Education | **Verified** | Three lessons with question, ≥3 functioning steps (series focus, time selection, view switch), sourced explanation, reset/return (`src-tauri/src/lessons.rs`; tests assert every referenced series/time exists and every quoted number matches the data). |
 | Solar-wind alert (13B) | **Verified** | 29 acceptance tests in `crates/swo-core/src/alert_tests.rs` + 6 scenario walk-throughs in `src-tauri/src/demo.rs` (spike-no-trigger, sustained-trigger, hysteresis, outage, clearance→new episode, quiet). Dismissal persistence, one alert per episode, settings-change isolation, replay/live separation (separate `ReplaySession` memory), crosshair never calls the evaluator. `docs/solar-wind-alert.md`. |
-| Packaging | **Not done (Windows)** / **Verified (macOS RC)** | macOS: `npx tauri build` → see "Local artifacts" below. Windows: `.github/workflows/windows-release.yml` configured; **has not run**; clean-machine install/run/runtime-provisioning/export/restart/upgrade/uninstall **untested**. Signing: unsigned RC; requirements documented in `docs/windows-build.md`, no certificate acquired. |
+| Packaging | **Not done (Windows)** / **Verified (macOS RC, .app only)** | macOS: `npm run build:macos-zip` → see "Local artifacts" below. DMG bundling is currently broken on this machine (macOS 26.6.2) due to a `create-dmg`/`bundle_dmg.sh` argument error unrelated to this app; `.app` bundling and zipping are unaffected. Windows: `.github/workflows/windows-release.yml` configured; **has not run**; clean-machine install/run/runtime-provisioning/export/restart/upgrade/uninstall **untested**. Signing: unsigned RC; requirements documented in `docs/windows-build.md`, no certificate acquired. |
 | Reproducibility | **Verified** | Fixture-only tests (no network in `cargo test`); exports round-trip (`round_trip_matches_the_source_series_exactly`); payload SHA-256 stored and exported; `cargo run --bin dump-demo` regenerates preview fixtures; build commands in README and `docs/windows-build.md`; lockfiles committed (`Cargo.lock`, `package-lock.json`). |
 
 ## Two review passes
@@ -40,7 +40,15 @@ metadata with acquisition times and PNG bytes.
 
 ## Local artifacts
 
-Filled in below once `npx tauri build` completes on macOS.
+`npm run build:macos-zip` (2026-09-06, Apple M5/macOS 26.6.2): produced
+`target/release/bundle/macos/Space Weather Observatory.app.zip`, 8.7 MB,
+SHA-256 `fc3cfc089a1ceb7e5fd91917ca76bd3ce4868aecbe5f189a6f63de5b0654ce22`.
+Unsigned; not installed or launched from the zip in this session (see Packaging row).
+
+Note: `tauri build` with the default `["nsis", "app", "dmg"]` targets fails on this
+machine — the vendored `bundle_dmg.sh` (`create-dmg` 1.2.1) exits with "Not enough
+arguments" on macOS 26.6.2, unrelated to this app's code. `build:macos-zip` now passes
+`--bundles app` to skip DMG bundling; the `.app` bundle and zip are unaffected.
 
 ## Explicitly untested / blocked
 
@@ -50,3 +58,4 @@ Filled in below once `npx tauri build` completes on macOS.
 - Official-rendering comparison of the aurora map — not performed.
 - Real sleep/resume cycle, clock-change while running — not exercised.
 - Code signing and timestamping — no certificate; documented only.
+- macOS DMG bundling — broken on this machine's `create-dmg`/`bundle_dmg.sh`; `.app` zip used instead.
