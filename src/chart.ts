@@ -69,6 +69,14 @@ export class ChartStack {
   private dragStart: number | null = null;
   private dragCurrent: number | null = null;
   private reducedMotion = false;
+  private resizeObserver: ResizeObserver | null = null;
+
+  destroy(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    this.onSelect = () => {};
+    this.onRange = () => {};
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -387,7 +395,9 @@ export class ChartStack {
       return panel.scale === "log" ? { min: 1e-9, max: 1e-3 } : { min: 0, max: 1 };
     }
     if (panel.scale === "log") {
-      return { min: Math.pow(10, Math.floor(Math.log10(min))), max: Math.pow(10, Math.ceil(Math.log10(max))) };
+      const lo = Math.floor(Math.log10(min));
+      const hi = Math.max(lo + 1, Math.ceil(Math.log10(max)));
+      return { min: Math.pow(10, lo), max: Math.pow(10, hi) };
     }
     if (panel.scale === "kp") return { min: 0, max: 9 };
     if (panel.zeroReference) {
@@ -581,6 +591,7 @@ export class ChartStack {
       if (!this.reducedMotion) this.render();
       else this.render();
     });
+    this.resizeObserver = observer;
     observer.observe(this.canvas);
     void rectWidth;
   }

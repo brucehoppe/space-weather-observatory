@@ -1,5 +1,6 @@
 [package]
 name = "space-weather-observatory"
+default-run = "space-weather-observatory"
 description = "Space Weather Observatory desktop application"
 version.workspace = true
 edition.workspace = true

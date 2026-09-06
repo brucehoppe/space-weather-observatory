@@ -33,19 +33,31 @@ Maintained so another session can resume. Dates are absolute (UTC).
 
 - **Windows verification not performed.** No Windows machine was available; the workflow is configured but has not run. Every Windows-specific claim (install, WebView2 bootstrap, upgrade, uninstall) is untested.
 - **Screen capture of the native window unavailable** in this session (macOS screen-recording permission and Chrome extension both absent). Native inspection was done via the app's own store/logs; visual inspection via headless-Chrome browser preview.
-- Chart PNG/SVG export is **not implemented** (CSV/JSON export is). Listed as next action.
-- Window bounds are **not yet persisted** (`window_bounds` setting exists; no save/restore wiring).
-- Local display time zone setting exists but the UI shows UTC everywhere; `fmtInZone` is implemented and unused in views.
+- PNG chart export is implemented; vector SVG export remains open.
+- Window bounds save/restore is wired; multi-monitor native verification remains open.
+- Local display time zone is shown in the detail panel; the main timeline remains explicitly UTC.
 - Sun-image sequence play/pause not implemented (single latest frame per passband).
-- Historical replay UI (`list_snapshots` / `enter_replay`) exists as commands but has no UI beyond the demo dataset.
+- Saved-snapshot replay picker is implemented; native interaction verification remains open.
 - `three_day_geomag_forecast` is parsed and shown in status but not rendered as its own panel.
 - Uninstall-time data purge option not offered by the installer (manual path documented).
 
+## Review continuation — 2026-09-06
+
+Fixed chart ResizeObserver cleanup, constant-decade log domains, pause/range control updates,
+visible application errors, forced reduced-motion handling, replay alert source/clock and
+atomic memory updates, stale live imagery leaking into replay, polling cache enforcement,
+and older responses replacing newer in-memory payloads. Added a saved-snapshot picker that
+selects the newest retained payload per product at or before the chosen retrieval time.
+CI now runs frontend tests on Node 24; Windows artifacts use the workspace target directory.
+
+Validation: 189 Rust tests, 11 frontend tests, production frontend build and strict Clippy pass.
+The browser automation connector reports no available browser; updated UI interactions have
+not been visually verified in this continuation. See release-readiness.md for packaging results.
+
 ## Next actions (in order)
 
-1. Run `windows-release.yml` on a Windows runner; execute the clean-machine checklist in `docs/windows-build.md`; record results.
-2. Chart PNG/SVG export with title/interval/units/source/status labels (spec §12).
-3. Persist and validate window bounds across monitors.
-4. Wire `display_time_zone` into the timeline/detail panel with explicit zone labels.
-5. Replay picker UI over stored snapshots.
-6. Apply the licence after the owner confirms attribution wording.
+1. Run Windows CI and the clean-machine checklist in `docs/windows-build.md`.
+2. Verify native replay, exports, focus order and multi-monitor window restoration.
+3. Add vector SVG export and solar-image sequence playback.
+4. Extend configurable local time display to the timeline.
+5. Apply the licence after the owner confirms attribution wording.

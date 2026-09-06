@@ -14,10 +14,12 @@ import { renderSourcesView } from "./sources";
 import { datasetNow, Store, type ViewName } from "./state";
 import type { Lesson } from "./types";
 import { SERIES } from "./types";
+import { snapshotsAt } from "./replay";
 
 const store = new Store();
 let chart: ChartStack | null = null;
 let chartCanvas: HTMLCanvasElement | null = null;
+let imageryRequest = 0;
 
 const root = document.getElementById("app");
 if (!root) throw new Error("application root missing");
@@ -27,6 +29,9 @@ if (!root) throw new Error("application root missing");
 function render(): void {
   const state = store.get();
   document.body.classList.toggle("reduced-motion", state.reducedMotion);
+  chart?.destroy();
+  chart = null;
+  chartCanvas = null;
   clear(root!);
   root!.setAttribute("aria-busy", state.dashboard ? "false" : "true");
 
@@ -51,9 +56,9 @@ function render(): void {
     root!.append(renderReadings(state));
     root!.append(renderWorkspace());
     root!.append(renderTimeline(state, {
-      onRange: (range) => { store.set({ range }); chart?.setRange(range); },
+      onRange: (range) => { store.set({ range }); chart?.setRange(range); renderSideOnly(); },
       onSelect: (time) => setSelection(time, true),
-      onTogglePause: () => store.set({ paused: !state.paused }),
+      onTogglePause: () => { store.set({ paused: !store.get().paused }); renderSideOnly(); },
       onReturnToNow: returnToNow,
     }));
   } else {
@@ -70,7 +75,9 @@ function render(): void {
   }
 
   root!.append(renderFooter());
-  if (state.error) announce(state.error);
+  if (state.error) {
+    root!.append(el("div", { class: "app-error", role: "alert" }, state.error));
+  }
 }
 
 function renderHeader(): HTMLElement {
@@ -97,6 +104,7 @@ function renderHeader(): HTMLElement {
     mode === "live"
       ? button("Demonstration dataset", () => void enterDemo(), "ghost")
       : button("Return to live", () => void exitReplay(), "primary"),
+    button("Saved snapshots", () => void openReplayPicker(), "ghost"),
     button("Refresh", () => void refreshAll(), "ghost"),
   );
 
@@ -176,7 +184,8 @@ function renderFooter(): HTMLElement {
 
 function mountChart(): void {
   const state = store.get();
-  if (!chartCanvas || !state.dashboard) return;
+  if (!chartCanvas?.isConnected || !state.dashboard || state.view !== "observatory") return;
+  chart?.destroy();
   chart = new ChartStack(chartCanvas);
   chart.setReducedMotion(state.reducedMotion);
   chart.setRange(state.range);
@@ -311,10 +320,46 @@ async function refreshAlert(): Promise<void> {
   }
 }
 
+async function openReplayPicker(): Promise<void> {
+  const dialog = el("dialog", { "aria-label": "Replay saved snapshots" });
+  const status = el("p", {}, "Loading saved snapshots…");
+  const body = el("div", { class: "dialog-body" },
+    el("h2", {}, "Replay saved snapshots"),
+    el("p", {}, "Inspect what was retrieved at a saved time. Each product uses its latest retained snapshot at or before that time; missing products remain unavailable."), status);
+  dialog.append(body, button("Close", () => dialog.close()));
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  document.body.append(dialog);
+  dialog.showModal();
+  try {
+    const groups = await Promise.all(store.get().sources.map((s) => ipc.listSnapshots(s.product, 500)));
+    if (!dialog.isConnected) return;
+    const snapshots = groups.flat();
+    const times = [...new Set(snapshots.map((s) => s.retrieved_at))].sort((a, b) => Date.parse(b) - Date.parse(a));
+    if (!times.length) { status.textContent = "No saved snapshots are available. The desktop application saves successfully retrieved products automatically."; return; }
+    const select = el("select", { "aria-label": "Snapshot retrieval time" });
+    for (const time of times) select.append(el("option", { value: time }, fmtUtc(time, true)));
+    const update = () => { status.textContent = `${snapshotsAt(snapshots, Date.parse(select.value)).length} products available at this time.`; };
+    select.addEventListener("change", update);
+    body.append(select);
+    update();
+    const open = button("Open replay", () => {
+      open.disabled = true;
+      void ipc.enterReplay(snapshotsAt(snapshots, Date.parse(select.value))).then((dashboard) => {
+        imageryRequest++;
+        store.set({ paused: true, activeLesson: null, sunImages: [], imageryError: "Solar imagery is unavailable for this saved replay." });
+        applyDashboardForced(dashboard);
+        dialog.close();
+      }).catch((e: unknown) => { status.textContent = `Could not open replay: ${String(e)}`; open.disabled = false; });
+    }, "primary");
+    body.append(open);
+  } catch (e) { status.textContent = `Could not load snapshots: ${String(e)}`; }
+}
+
 async function enterDemo(): Promise<void> {
   setShowDismissed(false);
   const dashboard = await ipc.enterDemo();
-  store.set({ paused: true });
+  imageryRequest++;
+  store.set({ paused: true, sunImages: [], imageryError: "Solar imagery is unavailable for this frozen dataset." });
   applyDashboardForced(dashboard);
 }
 
@@ -322,6 +367,7 @@ async function exitReplay(): Promise<void> {
   const dashboard = await ipc.exitReplay();
   store.set({ paused: false, activeLesson: null });
   applyDashboardForced(dashboard);
+  loadSunImages();
 }
 
 function applyDashboardForced(dashboard: import("./types").Dashboard): void {
@@ -408,6 +454,17 @@ async function exportChart(): Promise<void> {
   }
 }
 
+function loadSunImages(): void {
+  const request = ++imageryRequest;
+  void ipc.getSunImages().then((sunImages) => {
+    if (request !== imageryRequest || store.get().dashboard?.mode !== "live") return;
+    store.set({ sunImages, imageryError: null }); render();
+  }).catch((e: unknown) => {
+    if (request !== imageryRequest || store.get().dashboard?.mode !== "live") return;
+    store.set({ imageryError: `Solar imagery unavailable: ${String(e)}` }); render();
+  });
+}
+
 // --- Boot -----------------------------------------------------------------------
 
 async function boot(): Promise<void> {
@@ -417,7 +474,7 @@ async function boot(): Promise<void> {
     store.set({ view: requested });
   }
   window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", (e) => {
-    store.set({ reducedMotion: e.matches });
+    store.set({ reducedMotion: e.matches || !!store.get().settings?.force_reduced_motion });
     chart?.setReducedMotion(e.matches);
     render();
   });
@@ -437,9 +494,7 @@ async function boot(): Promise<void> {
   }
 
   // Imagery is fetched separately so a slow image never delays the dashboard.
-  ipc.getSunImages()
-    .then((sunImages) => { store.set({ sunImages, imageryError: null }); render(); })
-    .catch((e: unknown) => { store.set({ imageryError: `Solar imagery unavailable: ${String(e)}` }); });
+  if (store.get().dashboard?.mode === "live") loadSunImages();
 
   // Poll the backend for updated state. The backend does the actual network
   // work on each product's own cadence; this only reads what it has.

@@ -417,3 +417,5 @@ dialog .actions { display: flex; gap: 0.5rem; justify-content: flex-end; padding
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 .reduced-motion * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+
+.app-error { position: fixed; bottom: 32px; left: 16px; right: 16px; z-index: 100; padding: 12px; background: #472a22; color: #fff; border: 1px solid #efab79; }

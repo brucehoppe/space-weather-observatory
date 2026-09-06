@@ -32,19 +32,22 @@ and lessons. It is a layout/interaction check, not a desktop or Windows test.
 
 ## Run from source
 
-Prerequisites: Rust (stable), Node 20+, and the Tauri platform prerequisites for your OS
+Prerequisites: Rust (stable), Node 24+, and the Tauri platform prerequisites for your OS
 (<https://v2.tauri.app/start/prerequisites/>). No Python.
 
 ```bash
 npm ci
-cargo test --workspace         # 188 deterministic tests, fixture-only, no network
-npm test                       # 10 frontend unit tests (Node)
+cargo test --workspace         # 189 deterministic tests, fixture-only, no network
+npm test                       # 11 frontend unit tests (Node)
 npm run tauri dev              # desktop app with hot reload
 npm run tauri build            # installer for the current platform
 ```
 
 Browser preview only (no backend, frozen dataset): `npm run dev` → <http://localhost:5173/>
 (`?view=aurora|learn|sources`). Regenerate its fixtures with `cargo run --bin dump-demo`.
+
+Use **Saved snapshots** to replay retained provider data at a chosen retrieval time. Products
+without a retained snapshot at or before that time remain unavailable. **Return to live** exits replay.
 
 Refresh the captured provider originals (network, opt-in): `scripts/capture-fixtures.sh`,
 then update the date in `docs/sources.md`.

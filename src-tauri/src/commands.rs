@@ -65,11 +65,20 @@ pub async fn refresh_product(state: &AppState, product: Product) {
         )
     };
     if let Ok(snapshot) = stored {
-        state
-            .live
-            .write()
-            .await
-            .insert(product.key().to_string(), snapshot);
+        let mut live = state.live.write().await;
+        if live
+            .get(product.key())
+            .is_none_or(|prior| prior.retrieved_at <= snapshot.retrieved_at)
+        {
+            live.insert(product.key().to_string(), snapshot);
+        }
+        drop(live);
+        let settings = state.settings.read().await;
+        let store = state.store.lock().await;
+        let _ = store.enforce_limits(
+            settings.snapshot_retention,
+            settings.cache_limit_mb.saturating_mul(1024 * 1024),
+        );
     }
 }
 
@@ -187,10 +196,31 @@ pub struct AlertView {
 /// time are separate, so inspecting an old reading cannot retarget the detector.
 #[tauri::command]
 pub async fn evaluate_alert(state: State<'_, AppState>) -> CmdResult<AlertView> {
+    evaluate_alert_state(&state).await
+}
+
+async fn evaluate_alert_state(state: &AppState) -> CmdResult<AlertView> {
     let settings = state.settings.read().await.alert.clone();
-    let dashboard = state.dashboard().await;
-    let source = state.wind_source().await;
-    let now = Utc::now();
+    // Keep the session stable throughout evaluation, including its memory update.
+    let mut replay = state.replay.write().await;
+    let wall_now = Utc::now();
+    let dashboard = if let Some(session) = replay.as_ref() {
+        let at = session
+            .payloads
+            .values()
+            .map(|s| s.retrieved_at)
+            .max()
+            .unwrap_or(wall_now);
+        crate::snapshot::assemble(session.mode, &session.payloads, at, session.label.clone())
+    } else {
+        crate::snapshot::assemble(
+            Mode::Live,
+            &*state.live.read().await,
+            wall_now,
+            String::new(),
+        )
+    };
+    let now = dashboard.assembled_at;
 
     let speed_key = "noaa-swpc:rtsw_wind_1m:proton_speed";
     let samples = dashboard
@@ -199,25 +229,30 @@ pub async fn evaluate_alert(state: State<'_, AppState>) -> CmdResult<AlertView> 
         .map(|s| s.samples.clone())
         .unwrap_or_default();
 
+    let source = alert::SourceIdentity {
+        product: Product::SolarWindPlasma.key().into(),
+        spacecraft: samples
+            .iter()
+            .rev()
+            .find(|o| o.accepted().is_some())
+            .and_then(|o| o.instrument.clone()),
+    };
+
     let bz_series = dashboard.series.get("noaa-swpc:rtsw_mag_1m:bz_gsm");
     let bz_obs = bz_series.and_then(|s| s.last_accepted());
     let bz_stale = bz_obs
         .map(|o| (now - o.time) > Duration::minutes(settings.stale_after_minutes))
         .unwrap_or(true);
 
-    let is_replay = state.replay.read().await.is_some();
-    let evaluation = if is_replay {
-        // Replay evaluates in its own state and is discarded afterwards.
-        let mut replay = state.replay.write().await;
-        let session = replay.as_mut().expect("checked above");
-        let at = samples.last().map(|o| o.time).unwrap_or(now);
+    let evaluation = if let Some(session) = replay.as_mut() {
+        let at = now;
         let e = alert::evaluate(&samples, &settings, &session.memory, &source, at);
         session.memory = e.memory.clone();
         e
     } else {
-        let prior = state.alert_memory.read().await.clone();
-        let e = alert::evaluate(&samples, &settings, &prior, &source, now);
-        *state.alert_memory.write().await = e.memory.clone();
+        let mut memory = state.alert_memory.write().await;
+        let e = alert::evaluate(&samples, &settings, &memory, &source, now);
+        *memory = e.memory.clone();
         let store = state.store.lock().await;
         let _ = store.save_alert_memory(&e.memory);
         e
@@ -671,6 +706,31 @@ pub async fn clear_cache(state: State<'_, AppState>) -> CmdResult<CacheStatus> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn replay_alert_uses_dataset_clock_and_source_without_changing_live_memory() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = AppState::new(dir.path().join("config"), dir.path().join("data")).unwrap();
+        let before = state.alert_memory.read().await.clone();
+        *state.replay.write().await = Some(crate::ReplaySession {
+            mode: Mode::Demo,
+            payloads: demo::payloads(),
+            memory: AlertMemory::default(),
+            label: "demo".into(),
+        });
+        let view = evaluate_alert_state(&state).await.unwrap();
+        assert_eq!(view.context, Mode::Demo);
+        assert!(
+            view.source_spacecraft.is_some(),
+            "source must come from replay even with no live data"
+        );
+        assert!(
+            !view.bz_stale,
+            "frozen Bz must be evaluated against the dataset clock"
+        );
+        assert!(view.bz_gsm_nt.is_some());
+        assert_eq!(*state.alert_memory.read().await, before);
+    }
 
     #[tokio::test]
     async fn write_export_rejects_paths_the_ui_should_not_be_able_to_reach() {
