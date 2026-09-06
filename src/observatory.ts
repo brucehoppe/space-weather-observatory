@@ -318,12 +318,13 @@ export function renderSidePanel(
   chart: ChartStack | null,
   onExport: () => void,
   onExportChart: () => void = () => {},
+  onExportChartSvg: () => void = () => {},
 ): HTMLElement {
   const panel = el("aside", { class: "side-panel", "aria-label": "Selection details and source status" });
   const d = state.dashboard;
   if (!d) return panel;
 
-  panel.append(renderSelectionDetail(state, chart, onExport, onExportChart));
+  panel.append(renderSelectionDetail(state, chart, onExport, onExportChart, onExportChartSvg));
   panel.append(renderStatuses(d, state));
   panel.append(renderOutlook(d));
   panel.append(renderBulletins(d));
@@ -335,6 +336,7 @@ function renderSelectionDetail(
   _chart: ChartStack | null,
   onExport: () => void,
   onExportChart: () => void,
+  onExportChartSvg: () => void,
 ): HTMLElement {
   const section = el("section", { "aria-label": "Selected measurement" });
   section.append(el("h2", {}, state.selection.pinned ? "Pinned measurement" : "Latest measurement"));
@@ -396,7 +398,8 @@ function renderSelectionDetail(
   section.append(el("div", { style: "margin-top:.5rem" }, picker));
   section.append(el("div", { style: "margin-top:.4rem;display:flex;gap:.4rem;flex-wrap:wrap" },
     button("Export data (CSV)", onExport, "ghost"),
-    button("Export chart (PNG)", onExportChart, "ghost")));
+    button("Export chart (PNG)", onExportChart, "ghost"),
+    button("Export chart (SVG)", onExportChartSvg, "ghost")));
   picker.addEventListener("change", () => {
     picker.dispatchEvent(new CustomEvent("series-change", { detail: picker.value, bubbles: true }));
   });

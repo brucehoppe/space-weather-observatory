@@ -4,7 +4,7 @@
 import "./styles.css";
 import { openAlertExplanation, openAlertSettings, renderAlertBanner, setShowDismissed } from "./alertBanner";
 import { renderAuroraView } from "./aurora";
-import { ChartStack, renderChartExport } from "./chart";
+import { ChartStack, renderChartExport, renderChartExportSvg } from "./chart";
 import { announce, button, clear, el } from "./dom";
 import { fmtUtc } from "./format";
 import * as ipc from "./ipc";
@@ -148,7 +148,7 @@ function renderWorkspace(): HTMLElement {
   });
   attachSplitter(splitter);
 
-  workspace.append(centre, splitter, renderSidePanel(state, chart, exportSelection, exportChart));
+  workspace.append(centre, splitter, renderSidePanel(state, chart, exportSelection, exportChart, exportChartSvg));
   workspace.addEventListener("series-change", (e) => {
     store.set({ focusSeries: (e as CustomEvent<string>).detail });
     render();
@@ -208,7 +208,7 @@ function mountChart(): void {
 function renderSideOnly(): void {
   const state = store.get();
   const old = root!.querySelector(".side-panel");
-  if (old) old.replaceWith(renderSidePanel(state, chart, exportSelection, exportChart));
+  if (old) old.replaceWith(renderSidePanel(state, chart, exportSelection, exportChart, exportChartSvg));
   const timeline = root!.querySelector(".timeline");
   if (timeline) {
     timeline.replaceWith(renderTimeline(state, {
@@ -447,6 +447,24 @@ async function exportChart(): Promise<void> {
   try {
     const canvas = renderChartExport(chart, { title: "Space Weather Observatory — synchronized charts", sources, status, units });
     const saved = await ipc.savePngThroughDialog(`space-weather-charts-${new Date(state.range.end).toISOString().slice(0, 16).replace(/[:T]/g, "")}Z`, canvas.toDataURL("image/png"));
+    if (saved) announce(`Chart exported to ${saved}`);
+  } catch (e) {
+    store.set({ error: `Chart export failed: ${String(e)}` });
+    render();
+  }
+}
+
+async function exportChartSvg(): Promise<void> {
+  const state = store.get();
+  if (!chart || !state.dashboard) return;
+  const d = state.dashboard;
+  const sources = Array.from(new Set(Object.values(d.series).map((s) => s.provenance.source_url)));
+  const units = Array.from(new Set(Object.values(d.series).map((s) => `${s.label}: ${s.unit}${s.frame ? ` (${s.frame})` : ""}`)));
+  const status = `${d.mode === "live" ? "live snapshot" : d.mode === "demo" ? "frozen demonstration dataset" : "replay"} ` +
+    `${d.snapshot_id.slice(0, 12)} assembled ${d.assembled_at}; raw provider values; app ${d.app_version}`;
+  try {
+    const svg = renderChartExportSvg(chart, { title: "Space Weather Observatory — synchronized charts", sources, status, units });
+    const saved = await ipc.saveThroughDialog(`space-weather-charts-${new Date(state.range.end).toISOString().slice(0, 16).replace(/[:T]/g, "")}Z`, "svg", svg);
     if (saved) announce(`Chart exported to ${saved}`);
   } catch (e) {
     store.set({ error: `Chart export failed: ${String(e)}` });

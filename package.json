@@ -10,7 +10,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/chart.test.ts src/format.test.ts src/replay.test.ts",
+    "test": "node --test src/chart.test.ts src/chart-export.test.ts src/format.test.ts src/replay.test.ts",
     "tauri": "tauri",
     "build:macos-zip": "tauri build --bundles app && cd \"target/release/bundle/macos\" && rm -f \"Space Weather Observatory.app.zip\" && ditto -c -k --sequesterRsrc --keepParent \"Space Weather Observatory.app\" \"Space Weather Observatory.app.zip\""
   },

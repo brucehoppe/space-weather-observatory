@@ -33,7 +33,7 @@ Maintained so another session can resume. Dates are absolute (UTC).
 
 - **Windows verification not performed.** No Windows machine was available; the workflow is configured but has not run. Every Windows-specific claim (install, WebView2 bootstrap, upgrade, uninstall) is untested.
 - **Screen capture of the native window unavailable** in this session (macOS screen-recording permission and Chrome extension both absent). Native inspection was done via the app's own store/logs; visual inspection via headless-Chrome browser preview.
-- PNG chart export is implemented; vector SVG export remains open.
+- PNG and vector SVG chart export are both implemented (`renderChartExportSvg` in `src/chart.ts`, regenerated from the series data rather than the canvas bitmap).
 - Window bounds save/restore is wired; multi-monitor native verification remains open.
 - Local display time zone is shown in the detail panel; the main timeline remains explicitly UTC.
 - Sun-image sequence play/pause not implemented (single latest frame per passband).
@@ -58,6 +58,6 @@ not been visually verified in this continuation. See release-readiness.md for pa
 
 1. Run Windows CI and the clean-machine checklist in `docs/windows-build.md`.
 2. Verify native replay, exports, focus order and multi-monitor window restoration.
-3. Add vector SVG export and solar-image sequence playback.
+3. Add solar-image sequence playback.
 4. Extend configurable local time display to the timeline.
 5. Apply the licence after the owner confirms attribution wording.
