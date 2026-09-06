@@ -68,6 +68,19 @@ pub struct AuroraMeta {
 /// Raw payloads keyed by product key, as stored.
 pub type Payloads = BTreeMap<String, StoredSnapshot>;
 
+/// Newest accepted sample time in a raw list.
+///
+/// Provider payloads are not guaranteed to be sorted — the RTSW products
+/// interleave several spacecraft — so this takes a maximum rather than the last
+/// element. Reading the last row instead would make a healthy feed look stale.
+fn newest_sample(samples: &[Observation]) -> Option<DateTime<Utc>> {
+    samples
+        .iter()
+        .filter(|o| o.accepted().is_some())
+        .map(|o| o.time)
+        .max()
+}
+
 #[allow(clippy::too_many_arguments)] // one call site per product; a struct here
                                      // would only move the same fields around
 fn series_of(
@@ -105,7 +118,16 @@ fn status(
     now: DateTime<Utc>,
     error: Option<String>,
 ) -> ProductStatus {
-    let state = match (stored, &error, last_sample) {
+    // For event-driven products the retrieval time is what freshness means: the
+    // newest bulletin can legitimately be days old on a perfectly healthy feed,
+    // and calling that "stale" would be the same inference this application
+    // refuses to make elsewhere.
+    let freshness_time = if product.freshness_from_fetch() {
+        stored.map(|s| s.retrieved_at)
+    } else {
+        last_sample
+    };
+    let state = match (stored, &error, freshness_time) {
         (None, Some(_), _) => FeedState::Unavailable,
         (None, None, _) => FeedState::Unavailable,
         (Some(_), Some(_), _) => FeedState::Error,
@@ -157,7 +179,7 @@ pub fn assemble(
             Ok(streams) => match rtsw::active_wind(&streams) {
                 Some(active) => {
                     wind_spacecraft = Some(active.spacecraft.clone());
-                    wind_last = active.speed_km_s.last().map(|o| o.time);
+                    wind_last = newest_sample(&active.speed_km_s);
                     for (measurement, label, unit, samples) in [
                         (
                             "proton_speed",
@@ -207,7 +229,7 @@ pub fn assemble(
             Ok(streams) => match rtsw::active_mag(&streams) {
                 Some(active) => {
                     mag_spacecraft = Some(active.spacecraft.clone());
-                    mag_last = active.bt_nt.last().map(|o| o.time);
+                    mag_last = newest_sample(&active.bt_nt);
                     for (measurement, label, frame, samples) in [
                         ("bt", "Total magnetic field |B|", None, active.bt_nt.clone()),
                         ("bz_gsm", "Bz", Some("GSM"), active.bz_gsm_nt.clone()),
@@ -248,7 +270,7 @@ pub fn assemble(
             Ok(channels) => {
                 for c in &channels {
                     xray_satellite = Some(c.satellite.clone());
-                    xray_last = c.flux_w_m2.last().map(|o| o.time).max(xray_last);
+                    xray_last = newest_sample(&c.flux_w_m2).max(xray_last);
                     let measurement = match c.band {
                         swo_core::flare::XrayBand::Long => "xray_flux_long",
                         swo_core::flare::XrayBand::Short => "xray_flux_short",
@@ -321,9 +343,11 @@ pub fn assemble(
             series.insert(s.id.key(), s);
         }
     }
+    // Freshness is judged by the newest interval that has actually begun; the
+    // provider may already stamp the next interval as "estimated".
     let kp_last = kp_values
         .iter()
-        .filter(|i| !i.kind.is_forecast())
+        .filter(|i| !i.kind.is_forecast() && i.observation.time <= now)
         .map(|i| i.observation.time)
         .max();
     statuses.push(status(
@@ -346,7 +370,12 @@ pub fn assemble(
     statuses.push(status(
         Product::NoaaScales,
         payloads.get(Product::NoaaScales.key()),
-        scale_days.iter().filter_map(|d| d.time).max(),
+        // Day 0 is the current-status entry; later keys are forecast days and
+        // would date the product in the future.
+        scale_days
+            .iter()
+            .find(|d| d.day_offset == 0)
+            .and_then(|d| d.time),
         now,
         scales_err,
     ));
@@ -758,6 +787,42 @@ mod tests {
     fn the_aurora_grid_is_available_from_the_same_payloads() {
         let g = aurora_grid(&fixture_payloads(capture_time())).unwrap();
         assert_eq!(g.lon_count, 360);
+    }
+
+    #[test]
+    fn a_feed_a_few_minutes_behind_the_clock_is_fresh_not_stale() {
+        // The fixture's newest wind sample is 17:59; capture was 18:04:33.
+        let d = assemble(
+            Mode::Live,
+            &fixture_payloads(capture_time()),
+            capture_time(),
+            "t".into(),
+        );
+        let s = d
+            .statuses
+            .iter()
+            .find(|s| s.product == "rtsw_wind_1m")
+            .unwrap();
+        assert_eq!(s.state, FeedState::Ok);
+        assert_eq!(
+            s.last_sample_time.unwrap().to_rfc3339(),
+            "2026-09-06T17:59:00+00:00",
+            "the newest sample, not the last row of an interleaved payload"
+        );
+    }
+
+    #[test]
+    fn a_quiet_bulletin_feed_is_not_reported_stale() {
+        // Newest bulletin in the fixture was issued hours before capture. A
+        // healthy feed with nothing new to say is fresh, not stale.
+        let d = assemble(
+            Mode::Live,
+            &fixture_payloads(capture_time()),
+            capture_time(),
+            "t".into(),
+        );
+        let s = d.statuses.iter().find(|s| s.product == "alerts").unwrap();
+        assert_eq!(s.state, FeedState::Ok);
     }
 
     #[test]

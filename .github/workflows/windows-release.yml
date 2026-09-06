@@ -1,0 +1,35 @@
+name: Windows release candidate
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build-windows:
+    name: Build x64 installer (unsigned)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm }
+      - run: npm ci
+      - run: cargo test --workspace
+      - run: npm run build
+      - run: npx tauri build
+      - name: Checksums
+        shell: pwsh
+        run: |
+          $out = "src-tauri/target/release/bundle/nsis"
+          Get-ChildItem "$out/*.exe" | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.Name)"
+          } | Set-Content "$out/SHA256SUMS.txt"
+          Get-Content "$out/SHA256SUMS.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-release-candidate
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/SHA256SUMS.txt
+            src-tauri/target/release/space-weather-observatory.exe

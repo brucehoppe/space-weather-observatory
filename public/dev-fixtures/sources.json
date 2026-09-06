@@ -1,0 +1,79 @@
+[
+  {
+    "product": "rtsw_wind_1m",
+    "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
+    "page": "https://www.swpc.noaa.gov/products/real-time-solar-wind",
+    "cadence_seconds": 60,
+    "description": "Upstream solar-wind plasma: speed, density and temperature, 1-minute cadence, per spacecraft stream."
+  },
+  {
+    "product": "rtsw_mag_1m",
+    "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json",
+    "page": "https://www.swpc.noaa.gov/products/real-time-solar-wind",
+    "cadence_seconds": 60,
+    "description": "Upstream interplanetary magnetic field: |B| and Bz in GSM and GSE, 1-minute cadence."
+  },
+  {
+    "product": "goes_xrays_1day",
+    "url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json",
+    "page": "https://www.swpc.noaa.gov/products/goes-x-ray-flux",
+    "cadence_seconds": 60,
+    "description": "GOES X-ray flux in both documented passbands, 1-minute cadence."
+  },
+  {
+    "product": "goes_instrument_sources",
+    "url": "https://services.swpc.noaa.gov/json/goes/instrument-sources.json",
+    "page": "https://www.swpc.noaa.gov/products/goes-x-ray-flux",
+    "cadence_seconds": 3600,
+    "description": "Which GOES satellite is primary and secondary for each instrument."
+  },
+  {
+    "product": "planetary_k_index",
+    "url": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
+    "page": "https://www.swpc.noaa.gov/products/planetary-k-index",
+    "cadence_seconds": 900,
+    "description": "NOAA estimated planetary K-index, 3-hour intervals."
+  },
+  {
+    "product": "planetary_k_index_forecast",
+    "url": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",
+    "page": "https://www.swpc.noaa.gov/products/planetary-k-index",
+    "cadence_seconds": 900,
+    "description": "Planetary Kp with observed, estimated and predicted intervals separated."
+  },
+  {
+    "product": "noaa_scales",
+    "url": "https://services.swpc.noaa.gov/products/noaa-scales.json",
+    "page": "https://www.spaceweather.gov/noaa-scales-explanation",
+    "cadence_seconds": 300,
+    "description": "Current and forecast NOAA G, R and S scale status and published probabilities."
+  },
+  {
+    "product": "alerts",
+    "url": "https://services.swpc.noaa.gov/products/alerts.json",
+    "page": "https://www.spaceweather.gov/products/alerts-watches-and-warnings",
+    "cadence_seconds": 300,
+    "description": "SWPC alerts, watches and warnings with issuance, validity, cancellation and supersession."
+  },
+  {
+    "product": "ovation_aurora_latest",
+    "url": "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",
+    "page": "https://www.spaceweather.gov/products/aurora-30-minute-forecast",
+    "cadence_seconds": 300,
+    "description": "OVATION aurora model grid with its own observation and forecast times."
+  },
+  {
+    "product": "three_day_forecast",
+    "url": "https://services.swpc.noaa.gov/text/3-day-forecast.txt",
+    "page": "https://www.spaceweather.gov/products/3-day-forecast",
+    "cadence_seconds": 1800,
+    "description": "NOAA 3-day forecast: Kp breakdown, radio and radiation outlook."
+  },
+  {
+    "product": "three_day_geomag_forecast",
+    "url": "https://services.swpc.noaa.gov/text/3-day-geomag-forecast.txt",
+    "page": "https://www.spaceweather.gov/products/3-day-geomagnetic-forecast",
+    "cadence_seconds": 1800,
+    "description": "NOAA 3-day geomagnetic forecast: Ap, probabilities and Kp breakdown."
+  }
+]

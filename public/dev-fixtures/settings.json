@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "display_time_zone": "UTC",
+  "region_label": null,
+  "alert": {
+    "enabled": true,
+    "entry_threshold_km_s": 500.0,
+    "persistence_minutes": 10,
+    "hysteresis_km_s": 25.0,
+    "clearance_minutes": 5,
+    "cadence_seconds": 60,
+    "stale_after_minutes": 15,
+    "settings_version": 1
+  },
+  "cache_limit_mb": 256,
+  "snapshot_retention": 48,
+  "force_reduced_motion": false,
+  "window_bounds": null
+}

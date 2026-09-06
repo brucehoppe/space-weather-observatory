@@ -488,6 +488,25 @@ pub async fn export_series(
 /// parent traversal, and must carry an expected extension.
 #[tauri::command]
 pub async fn write_export(path: String, contents: String) -> CmdResult<String> {
+    let path = validated_export_path(&path, &["csv", "json", "svg"])?;
+    std::fs::write(&path, contents).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+/// Write a binary export (PNG) supplied as base64, to a dialog-chosen path.
+/// Same path validation as `write_export`.
+#[tauri::command]
+pub async fn write_export_binary(path: String, base64_contents: String) -> CmdResult<String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_contents.as_bytes())
+        .map_err(|e| format!("export payload was not valid base64: {e}"))?;
+    let path = validated_export_path(&path, &["png", "svg"])?;
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+fn validated_export_path(path: &str, extensions: &[&str]) -> CmdResult<PathBuf> {
     let path = PathBuf::from(path);
     if !path.is_absolute() {
         return Err("export path must be absolute".into());
@@ -501,18 +520,15 @@ pub async fn write_export(path: String, contents: String) -> CmdResult<String> {
     let ok_ext = path
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| {
-            matches!(
-                e.to_ascii_lowercase().as_str(),
-                "csv" | "json" | "png" | "svg"
-            )
-        })
+        .map(|e| extensions.contains(&e.to_ascii_lowercase().as_str()))
         .unwrap_or(false);
     if !ok_ext {
-        return Err("export must be saved as .csv, .json, .png or .svg".into());
+        return Err(format!(
+            "export must be saved as one of: {}",
+            extensions.join(", ")
+        ));
     }
-    std::fs::write(&path, contents).map_err(|e| e.to_string())?;
-    Ok(path.display().to_string())
+    Ok(path)
 }
 
 // --- Reference material ------------------------------------------------------
@@ -607,6 +623,15 @@ pub struct LessonStep {
 #[tauri::command]
 pub fn get_lessons() -> Vec<Lesson> {
     crate::lessons::lessons()
+}
+
+// --- Window bounds -------------------------------------------------------------
+
+/// Persist window bounds. Called by the shell on close; validated on restore.
+pub async fn save_window_bounds(state: &AppState, bounds: crate::settings::WindowBounds) {
+    let mut settings = state.settings.write().await;
+    settings.window_bounds = Some(bounds);
+    let _ = settings.save(&state.config_dir);
 }
 
 // --- Cache -------------------------------------------------------------------

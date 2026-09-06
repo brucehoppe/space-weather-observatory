@@ -104,7 +104,21 @@ impl AppState {
     pub async fn dashboard(&self) -> Dashboard {
         let now = Utc::now();
         if let Some(session) = self.replay.read().await.as_ref() {
-            return snapshot::assemble(session.mode, &session.payloads, now, session.label.clone());
+            // Replay and demo are evaluated at the dataset's own time. Using the
+            // wall clock would make every stored product read as hours stale and
+            // would date a frozen snapshot against today.
+            let dataset_now = session
+                .payloads
+                .values()
+                .map(|s| s.retrieved_at)
+                .max()
+                .unwrap_or(now);
+            return snapshot::assemble(
+                session.mode,
+                &session.payloads,
+                dataset_now,
+                session.label.clone(),
+            );
         }
         let live = self.live.read().await;
         let id = live
@@ -140,6 +154,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(state)
         .setup(|app| {
+            restore_window_bounds(app);
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 use tauri::Manager;
@@ -169,11 +184,68 @@ pub fn run() {
             commands::evaluate_scenario,
             commands::export_series,
             commands::write_export,
+            commands::write_export_binary,
             commands::get_sources,
             commands::get_lessons,
             commands::cache_status,
             commands::clear_cache,
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                remember_window_bounds(window);
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running Space Weather Observatory");
+}
+
+/// Apply remembered bounds only if they still intersect a connected monitor;
+/// otherwise keep the default centred window (spec §6: safe across monitors).
+fn restore_window_bounds(app: &mut tauri::App) {
+    use tauri::Manager;
+    let state = app.state::<AppState>();
+    let Some(bounds) = state.settings.blocking_read().window_bounds else {
+        return;
+    };
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(monitors) = window.available_monitors() else {
+        return;
+    };
+    let visible = monitors.iter().any(|m| {
+        let p = m.position();
+        let s = m.size();
+        let (mx0, my0) = (p.x, p.y);
+        let (mx1, my1) = (p.x + s.width as i32, p.y + s.height as i32);
+        // Require a meaningful overlap, not just a corner pixel.
+        let ox = (bounds.x + bounds.width as i32).min(mx1) - bounds.x.max(mx0);
+        let oy = (bounds.y + bounds.height as i32).min(my1) - bounds.y.max(my0);
+        ox > 200 && oy > 150
+    });
+    if !visible || bounds.width < 960 || bounds.height < 640 {
+        return;
+    }
+    let _ = window.set_position(tauri::PhysicalPosition::new(bounds.x, bounds.y));
+    let _ = window.set_size(tauri::PhysicalSize::new(bounds.width, bounds.height));
+    if bounds.maximized {
+        let _ = window.maximize();
+    }
+}
+
+fn remember_window_bounds(window: &tauri::Window) {
+    use tauri::Manager;
+    let maximized = window.is_maximized().unwrap_or(false);
+    let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) else {
+        return;
+    };
+    let bounds = settings::WindowBounds {
+        x: pos.x,
+        y: pos.y,
+        width: size.width,
+        height: size.height,
+        maximized,
+    };
+    let state = window.state::<AppState>();
+    tauri::async_runtime::block_on(commands::save_window_bounds(&state, bounds));
 }

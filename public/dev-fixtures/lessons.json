@@ -1,0 +1,118 @@
+[
+  {
+    "id": "wind-and-orientation",
+    "title": "Speed and orientation, read together",
+    "question": "The solar wind is always blowing. What makes some of it matter?",
+    "steps": [
+      {
+        "prompt": "Look at the solar-wind speed panel. Across this whole day it sits between roughly 326 and 381 km/s — ordinary, steady solar wind.",
+        "focus_series": "noaa-swpc:rtsw_wind_1m:proton_speed",
+        "select_time": "2026-09-06T06:00:00Z",
+        "view": "observatory"
+      },
+      {
+        "prompt": "Now look at Bz in the GSM frame. It swings either side of zero, reaching about -6 nT. Negative means southward — the orientation that can couple with Earth's field.",
+        "focus_series": "noaa-swpc:rtsw_mag_1m:bz_gsm",
+        "select_time": "2026-09-06T06:00:00Z",
+        "view": "observatory"
+      },
+      {
+        "prompt": "Pin a time where Bz is most negative and read the speed at the same instant. Both values come from the same upstream spacecraft, at the same minute.",
+        "focus_series": "noaa-swpc:rtsw_mag_1m:bz_gsm",
+        "select_time": "2026-09-06T12:00:00Z",
+        "view": "observatory"
+      },
+      {
+        "prompt": "Finally, check the Kp panel for the hours that follow. It stays at or below about 3.67 — below NOAA storm levels.",
+        "focus_series": "noaa-swpc:planetary_k_index_forecast:kp_estimated",
+        "select_time": "2026-09-06T15:00:00Z",
+        "view": "observatory"
+      }
+    ],
+    "explanation": "Speed alone is not an impact score, and a southward Bz alone is not a storm. Geomagnetic activity depends on speed and orientation *and* on how long that orientation persists. In this real interval the wind was slow, Bz wandered south only briefly, and no storm followed. That is the ordinary case, and recognising it is what makes the unusual case legible.",
+    "sources": [
+      "https://www.swpc.noaa.gov/products/real-time-solar-wind",
+      "https://www.swpc.noaa.gov/products/planetary-k-index",
+      "https://www.spaceweather.gov/phenomena/geomagnetic-storms"
+    ],
+    "dataset": "frozen-2026-09-06",
+    "attribution": "Frozen demonstration dataset: NOAA Space Weather Prediction Center products captured 2026-09-06T18:04Z. U.S. Government work, not subject to domestic copyright."
+  },
+  {
+    "id": "flare-wind-response",
+    "title": "A flare, the wind, and what came after",
+    "question": "A flare happened. Does a geomagnetic storm follow?",
+    "steps": [
+      {
+        "prompt": "Open the GOES X-ray panel. The largest long-band peak of this day is at 10:42 UTC, about 5.1 x 10^-6 W/m^2 — a C5.1 flux level on the 0.1-0.8 nm passband.",
+        "focus_series": "noaa-swpc:goes_xrays_1day:xray_flux_long",
+        "select_time": "2026-09-06T10:42:00Z",
+        "view": "observatory"
+      },
+      {
+        "prompt": "X-rays travel at the speed of light: this is the flare being seen, about eight minutes after it happened. It is not a measurement of anything arriving at Earth later.",
+        "focus_series": "noaa-swpc:goes_xrays_1day:xray_flux_long",
+        "select_time": "2026-09-06T10:42:00Z",
+        "view": "observatory"
+      },
+      {
+        "prompt": "Now look at the solar wind in the hours after 10:42. Speed stays near 350 km/s. Nothing in the upstream measurements changes in step with the flare.",
+        "focus_series": "noaa-swpc:rtsw_wind_1m:proton_speed",
+        "select_time": "2026-09-06T13:00:00Z",
+        "view": "observatory"
+      },
+      {
+        "prompt": "And the geomagnetic response: Kp for the intervals after the flare stays below storm levels. Check the official bulletins panel too — the G1 watch in effect is for 08 September, from CMEs on 05 September, not from this flare.",
+        "focus_series": "noaa-swpc:planetary_k_index_forecast:kp_estimated",
+        "select_time": "2026-09-06T15:00:00Z",
+        "view": "observatory"
+      }
+    ],
+    "explanation": "Three different quantities, three different clocks. The X-ray flux is light from the flare, arriving in about eight minutes. The upstream solar wind is measured by a spacecraft roughly a million miles ahead of Earth, so it reports material that will reach Earth some tens of minutes later. The geomagnetic response is measured at the ground, later still. Aligning them in time is useful; concluding that one caused another because they are near each other on a chart is not. In this real interval a C-class flare occurred and no geomagnetic storm followed — an X-ray spike is not evidence of an Earth-directed CME.",
+    "sources": [
+      "https://www.swpc.noaa.gov/products/goes-x-ray-flux",
+      "https://www.swpc.noaa.gov/products/real-time-solar-wind",
+      "https://www.spaceweather.gov/products/alerts-watches-and-warnings"
+    ],
+    "dataset": "frozen-2026-09-06",
+    "attribution": "Frozen demonstration dataset: NOAA Space Weather Prediction Center products captured 2026-09-06T18:04Z. U.S. Government work, not subject to domestic copyright."
+  },
+  {
+    "id": "observation-versus-forecast",
+    "title": "What the aurora forecast actually says",
+    "question": "The app shows an aurora map. Is that where the aurora is?",
+    "steps": [
+      {
+        "prompt": "Open the Aurora view. Read the two times in the header: the observation time the model was run from, and the forecast time it applies to. They are different, and the gap is whatever this issue states — not a fixed 30 minutes.",
+        "focus_series": null,
+        "select_time": null,
+        "view": "aurora"
+      },
+      {
+        "prompt": "The colour scale is the OVATION model's probability of visible aurora in each 1-degree grid cell. It is a property of the cell, not of you: it does not know whether it is dark, or cloudy, where you are.",
+        "focus_series": null,
+        "select_time": null,
+        "view": "aurora"
+      },
+      {
+        "prompt": "Compare with the observations panel: Kp is an index computed from ground magnetometers over three-hour intervals. It is a different quantity, on a different clock, from a different instrument network.",
+        "focus_series": "noaa-swpc:planetary_k_index_forecast:kp_estimated",
+        "select_time": "2026-09-06T15:00:00Z",
+        "view": "observatory"
+      },
+      {
+        "prompt": "Finally open Sources. Every number you just read has a product page, a machine-readable endpoint and a verification date behind it.",
+        "focus_series": null,
+        "select_time": null,
+        "view": "sources"
+      }
+    ],
+    "explanation": "A forecast is a statement about the future made at a stated time, and it carries its own validity. An observation is a measurement of something that already happened. The aurora map is a model forecast; Kp is an index derived from observations; neither is a personal viewing probability. Whether you would actually see aurora also depends on darkness, cloud and how far you are from the model's oval — inputs this application does not have and therefore does not pretend to.",
+    "sources": [
+      "https://www.spaceweather.gov/products/aurora-30-minute-forecast",
+      "https://www.swpc.noaa.gov/products/planetary-k-index"
+    ],
+    "dataset": "frozen-2026-09-06",
+    "attribution": "Frozen demonstration dataset: NOAA Space Weather Prediction Center products captured 2026-09-06T18:04Z. U.S. Government work, not subject to domestic copyright."
+  }
+]

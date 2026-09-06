@@ -1,0 +1,11 @@
+{
+  "state": {
+    "state": "monitoring"
+  },
+  "memory": {
+    "open_episode": null,
+    "history": [],
+    "settings_version": 1
+  },
+  "newly_active": false
+}

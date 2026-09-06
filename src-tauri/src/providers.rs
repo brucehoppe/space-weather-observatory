@@ -113,9 +113,30 @@ impl Product {
         }
     }
 
-    /// After this long without a fresh sample the product is shown as stale.
+    /// After this long without fresh data the product is shown as stale.
+    /// Ten nominal cadences, with a ten-minute floor: SWPC's real-time streams
+    /// routinely lag a few minutes behind the wall clock, and calling that
+    /// "stale" would cry wolf on every panel.
     pub fn stale_after_seconds(self) -> i64 {
-        self.poll_seconds() * 5
+        (self.poll_seconds() * 10).max(600)
+    }
+
+    /// Whether freshness is judged by the newest item in the product or by the
+    /// last successful fetch.
+    ///
+    /// Bulletins and outlooks are event-driven: SWPC issues them when there is
+    /// something to say. Judging them by the age of the newest bulletin would
+    /// report a healthy feed as stale simply because nothing had happened —
+    /// exactly the inference this application must never make.
+    pub fn freshness_from_fetch(self) -> bool {
+        matches!(
+            self,
+            Product::Alerts
+                | Product::NoaaScales
+                | Product::ThreeDayForecast
+                | Product::ThreeDayGeomagForecast
+                | Product::GoesInstrumentSources
+        )
     }
 }
 
