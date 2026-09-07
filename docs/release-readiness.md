@@ -40,10 +40,13 @@ metadata with acquisition times and PNG bytes.
 
 ## Local artifacts
 
-`npm run build:macos-zip` (2026-09-06, Apple M5/macOS 26.6.2): produced
-`target/release/bundle/macos/Space Weather Observatory.app.zip`, 8.7 MB,
-SHA-256 `fc3cfc089a1ceb7e5fd91917ca76bd3ce4868aecbe5f189a6f63de5b0654ce22`.
-Unsigned; not installed or launched from the zip in this session (see Packaging row).
+`npm run build:macos-zip` (2026-09-06, Apple M5/macOS 26.6.2), rebuilt after adding
+vector SVG chart export: produced `target/release/bundle/macos/Space Weather Observatory.app.zip`,
+8.7 MB, SHA-256 `38e0e0a07a81f8d390cee1484d8cb657e2ecb23f627c79788ecf4bdfd3c468cb`.
+Unsigned. Launched from a prior build of the same `.app` bundle and confirmed it opens
+(see "Live-provider smoke" above); the SVG export dialog was exercised in a `tauri dev`
+session (native save dialog opens with the correct suggested filename and SVG filter)
+but the file save itself was not completed in that session.
 
 Note: `tauri build` with the default `["nsis", "app", "dmg"]` targets fails on this
 machine — the vendored `bundle_dmg.sh` (`create-dmg` 1.2.1) exits with "Not enough
