@@ -18,14 +18,18 @@ Maintained so another session can resume. Dates are absolute (UTC).
 | 2026-09-06 | Paired polar (azimuthal equidistant) aurora views, not a 3-D globe | Spec allows "paired polar views"; avoids a heavy graphics dependency; fallback text view included. |
 | 2026-09-06 | Browser-preview shim (`src/devMock.ts`) serving frozen JSON | Screen capture and the Chrome extension were both unavailable to this session; needed for the 390 px / multi-resolution checks the spec asks for. Inert inside the desktop shell. |
 | 2026-09-06 | Replay reconstructs "what was published at retrieval time" | That is what stored payloads contain; revised event times would need provider version history. |
+| 2026-09-17 | Added Solar Cycle 25 progression (2 new products: observed monthly indices, predicted consensus panel) and a NOAA G/R/S scales panel in the side panel | Both were already fetched/parsed in part (scales) or entirely new (solar cycle) but never surfaced in the UI; closes a real gap between data collected and data taught. |
+| 2026-09-17 | `observed_swpc_ssn` and `f10_7` in the solar-cycle observed product are `Option<f64>`, not raw `f64` | The `-1` sentinel is not confined to the `smoothed_*` fields as first assumed — confirmed against the captured fixture (negative in 2976/3332 and 3069/3332 rows) before shipping. |
+| 2026-09-17 | Sun-image sequence playback fetches frames at explicit, evenly-spaced past instants and never autoplays | Consistent with the existing rule that imagery timestamps are always explicit; playback only starts on a user click, so it is never ambient motion reduced-motion settings would need to suppress. |
+| 2026-09-17 | Fourth lesson ("G, R and S are three scales, not one storm score") added, using real frozen fixture values (S1 on 05 Sep, G1 forecast for 08 Sep) | Same fixture-driven, tested-against-data discipline as the first three lessons; no synthetic values introduced. |
 
 ## Completed
 
 - Source contracts verified, captured, documented (`docs/sources.md`).
 - `swo-core`: model, 7 parsers, time alignment, aggregation, flux classification, alert state machine (29 acceptance tests), interpretation rule layer, export — 123 unit tests + 5 perf tests.
-- Backend: allow-listed fetcher with backoff/coalescing, SQLite store (idempotent, bounded, LKG-preserving), snapshot assembly with per-product degradation, 21 narrow commands, imagery, demo, lessons — 60 tests.
-- Frontend: full-height shell, alert banner + settings dialog + explanation, readings with gauge/sparkline, "What this means for you", 5-panel synchronized chart stack with keyboard navigation, side panel (detail / status / outlook / bulletins), timeline, footer, aurora paired polar view with coastlines, learn view with 3 lessons + 6 scenarios, sources view with cache controls — 10 Node tests.
-- Live run on macOS verified: all 11 products fetched, stored, alert evaluated (monitoring).
+- Backend: allow-listed fetcher with backoff/coalescing, SQLite store (idempotent, bounded, LKG-preserving), snapshot assembly with per-product degradation, 23 narrow commands, imagery (including sequence playback), demo, lessons — 66 tests.
+- Frontend: full-height shell, alert banner + settings dialog + explanation, readings with gauge/sparkline, "What this means for you", 5-panel synchronized chart stack with keyboard navigation, side panel (detail / status / outlook / bulletins), timeline, footer, aurora paired polar view with coastlines, learn view with 4 lessons + 6 scenarios, sources view with cache controls — 10 Node tests.
+- Live run on macOS verified: all 13 products fetched, stored, alert evaluated (monitoring).
 - Docs: sources, alert, architecture, windows-build, privacy, licence proposal, README.
 - CI: `ci.yml` (deterministic), `windows-release.yml` (unsigned x64 RC + SHA-256).
 
@@ -36,7 +40,7 @@ Maintained so another session can resume. Dates are absolute (UTC).
 - PNG and vector SVG chart export are both implemented (`renderChartExportSvg` in `src/chart.ts`, regenerated from the series data rather than the canvas bitmap).
 - Window bounds save/restore is wired; multi-monitor native verification remains open.
 - Local display time zone is shown in the detail panel; the main timeline remains explicitly UTC.
-- Sun-image sequence play/pause not implemented (single latest frame per passband).
+- Sun-image sequence play/pause is implemented (`get_sun_image_sequence`, `src/sources.ts`); verified via unit tests and a live provider fetch (SQLite cache), **not** via a GUI interaction pass — the Chrome extension was unavailable this session too.
 - Saved-snapshot replay picker is implemented; native interaction verification remains open.
 - `three_day_geomag_forecast` is parsed and shown in status but not rendered as its own panel.
 - Uninstall-time data purge option not offered by the installer (manual path documented).
@@ -50,14 +54,12 @@ and older responses replacing newer in-memory payloads. Added a saved-snapshot p
 selects the newest retained payload per product at or before the chosen retrieval time.
 CI now runs frontend tests on Node 24; Windows artifacts use the workspace target directory.
 
-Validation: 189 Rust tests, 11 frontend tests, production frontend build and strict Clippy pass.
+Validation: 199 Rust tests, 12 frontend tests, production frontend build and strict Clippy pass.
 The browser automation connector reports no available browser; updated UI interactions have
 not been visually verified in this continuation. See release-readiness.md for packaging results.
 
 ## Next actions (in order)
 
-1. Run Windows CI and the clean-machine checklist in `docs/windows-build.md`.
-2. Verify native replay, exports, focus order and multi-monitor window restoration.
-3. Add solar-image sequence playback.
-4. Extend configurable local time display to the timeline.
-5. Apply the licence after the owner confirms attribution wording.
+1. Run Windows CI (`scripts/build-windows.ps1` via `.github/workflows/windows-release.yml`) and the clean-machine checklist in `docs/windows-build.md`.
+2. Verify native replay, exports, focus order, multi-monitor window restoration, and the new sun-image sequence playback controls — all via a real GUI pass (browser automation was unavailable in every session so far).
+3. Extend configurable local time display to the timeline.

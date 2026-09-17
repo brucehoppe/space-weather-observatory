@@ -1,11 +1,17 @@
 /** Sources & References, privacy, cache and attribution (spec §11, §12). */
 import { button, el } from "./dom";
-import { fmtBytes, fmtDuration, fmtUtc } from "./format";
+import { fmtBytes, fmtDuration, fmtNumber, fmtUtc } from "./format";
 import * as ipc from "./ipc";
 import { MAP_CREDIT } from "./aurora";
-import type { AppState } from "./state";
+import type { AppState, SunPassband } from "./state";
 
-export function renderSourcesView(state: AppState): HTMLElement {
+export interface SourcesCallbacks {
+  onLoadSequence: (passband: SunPassband) => void;
+  onTogglePlayback: (passband: SunPassband) => void;
+  onStepFrame: (passband: SunPassband, delta: number) => void;
+}
+
+export function renderSourcesView(state: AppState, cb: SourcesCallbacks): HTMLElement {
   const view = el("div", { class: "view" });
   view.append(
     el("h1", {}, "Sources & references"),
@@ -35,18 +41,24 @@ export function renderSourcesView(state: AppState): HTMLElement {
   if (state.sunImages.length) {
     const wrap = el("div", { style: "display:flex;gap:.75rem;flex-wrap:wrap" });
     for (const img of state.sunImages) {
+      const seq = state.sunSequences[img.passband];
+      const shownFrame = seq && seq.frames.length ? seq.frames[seq.index] : undefined;
+      const shown = shownFrame ?? img;
       wrap.append(el("figure", { style: "margin:0;max-width:320px" },
-        el("img", { src: img.data_uri, alt: `${img.label} solar image`, style: "width:100%;border-radius:6px" }),
+        el("img", { src: shown.data_uri, alt: `${shown.label} solar image`, style: "width:100%;border-radius:6px" }),
         el("figcaption", { class: "note" },
-          `${img.label} · acquired ${fmtUtc(img.acquired_at)}`,
-          el("div", {}, img.false_colour ? "False colour." : "", ` ${img.description}`),
-          el("div", {}, img.credit)),
+          `${shown.label} · acquired ${fmtUtc(shown.acquired_at)}`,
+          el("div", {}, shown.false_colour ? "False colour." : "", ` ${shown.description}`),
+          el("div", {}, shown.credit)),
+        renderSequenceControls(state, cb, img.passband),
       ));
     }
     view.append(wrap);
   } else {
     view.append(el("p", { class: "note" }, state.imageryError ?? "Solar imagery has not been retrieved yet."));
   }
+
+  view.append(renderSolarCycle(state));
 
   view.append(el("h2", {}, "Scientific methods"));
   view.append(el("ul", {},
@@ -79,6 +91,103 @@ export function renderSourcesView(state: AppState): HTMLElement {
   view.append(el("p", { class: "note" },
     `Space Weather Observatory ${state.dashboard?.app_version ?? "—"} · data schema ${state.dashboard?.schema_version ?? "—"}`));
   return view;
+}
+
+function renderSolarCycle(state: AppState): HTMLElement {
+  const section = el("section", {});
+  section.append(el("h2", {}, "Solar Cycle 25 progression"));
+  const d = state.dashboard;
+  const observed = d?.solar_cycle_observed ?? [];
+  const predicted = d?.solar_cycle_predicted ?? [];
+  if (!observed.length && !predicted.length) {
+    section.append(el("p", { class: "note" },
+      "Solar cycle progression unavailable. That is a gap in information, not evidence the cycle has ended."));
+    return section;
+  }
+
+  section.append(el("p", {},
+    "The sunspot number and F10.7 radio flux over the current 11-year solar cycle, monthly, against the " +
+    "official consensus prediction panel's stated expected range. This is context for the activity level " +
+    "behind the numbers above, not a forecast this application makes itself."));
+
+  const latest = observed.length ? observed[observed.length - 1] : undefined;
+  if (latest) {
+    const matchingPrediction = predicted.find((p) => p.month === latest.month);
+    section.append(el("p", { class: "note" },
+      `Latest observed month (${latest.month}): sunspot number ${fmtNumber(latest.ssn, 1)}` +
+      (latest.observed_swpc_ssn !== null ? ` (NOAA's own provisional figure: ${fmtNumber(latest.observed_swpc_ssn, 1)})` : "") +
+      (latest.f10_7 !== null ? `, F10.7 radio flux ${fmtNumber(latest.f10_7, 1)} sfu.` : "."),
+      matchingPrediction
+        ? ` The panel's prediction for the same month was ${fmtNumber(matchingPrediction.predicted_ssn, 1)}, ` +
+          `expected range ${fmtNumber(matchingPrediction.low_ssn, 1)}–${fmtNumber(matchingPrediction.high_ssn, 1)}.`
+        : ""));
+  }
+
+  if (observed.length) {
+    section.append(el("h3", { style: "font-size:12.5px;margin:.5rem 0 .2rem" }, "Observed (most recent months)"));
+    const obsTable = el("table", { class: "table" },
+      el("tr", {}, el("th", {}, "Month"), el("th", {}, "SSN"), el("th", {}, "NOAA provisional SSN"), el("th", {}, "F10.7")));
+    for (const m of observed.slice(-6)) {
+      obsTable.append(el("tr", {},
+        el("td", {}, m.month),
+        el("td", {}, fmtNumber(m.ssn, 1)),
+        el("td", {}, fmtNumber(m.observed_swpc_ssn, 1)),
+        el("td", {}, fmtNumber(m.f10_7, 1))));
+    }
+    section.append(obsTable);
+  }
+
+  if (predicted.length) {
+    section.append(el("h3", { style: "font-size:12.5px;margin:.5rem 0 .2rem" }, "Predicted (consensus panel, next months)"));
+    const predTable = el("table", { class: "table" },
+      el("tr", {}, el("th", {}, "Month"), el("th", {}, "Predicted SSN"), el("th", {}, "Expected range")));
+    for (const m of predicted.slice(0, 6)) {
+      predTable.append(el("tr", {},
+        el("td", {}, m.month),
+        el("td", {}, fmtNumber(m.predicted_ssn, 1)),
+        el("td", {}, `${fmtNumber(m.low_ssn, 1)}–${fmtNumber(m.high_ssn, 1)}`)));
+    }
+    section.append(predTable);
+  }
+
+  section.append(el("p", { class: "note" },
+    "See ", el("a", { href: "https://www.spaceweather.gov/products/solar-cycle-progression", target: "_blank", rel: "noreferrer" }, "NOAA's solar cycle progression product"), "."));
+  return section;
+}
+
+function renderSequenceControls(state: AppState, cb: SourcesCallbacks, passband: SunPassband): HTMLElement {
+  const seq = state.sunSequences[passband];
+  const wrap = el("div", { class: "sequence-controls" });
+
+  if (!seq) {
+    wrap.append(button("Play sequence (last 2.5 h)", () => cb.onLoadSequence(passband), "ghost"));
+    return wrap;
+  }
+  if (seq.loading) {
+    wrap.append(el("span", { class: "note" }, "Loading sequence…"));
+    return wrap;
+  }
+  if (seq.error) {
+    wrap.append(
+      el("span", { class: "note warn-text" }, `Sequence unavailable: ${seq.error}`),
+      button("Retry", () => cb.onLoadSequence(passband), "ghost"),
+    );
+    return wrap;
+  }
+  if (seq.frames.length < 2) {
+    wrap.append(el("span", { class: "note" }, "Not enough distinct frames were returned to animate."));
+    return wrap;
+  }
+
+  wrap.append(
+    el("div", { style: "display:flex;gap:.3rem;align-items:center" },
+      button(seq.playing ? "Pause" : "Play", () => cb.onTogglePlayback(passband), "ghost"),
+      button("◀", () => cb.onStepFrame(passband, -1), "ghost"),
+      el("span", { class: "note" }, `Frame ${seq.index + 1} / ${seq.frames.length}`),
+      button("▶", () => cb.onStepFrame(passband, 1), "ghost"),
+    ),
+  );
+  return wrap;
 }
 
 function li(text: string): HTMLElement {

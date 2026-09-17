@@ -114,5 +114,43 @@
     ],
     "dataset": "frozen-2026-09-06",
     "attribution": "Frozen demonstration dataset: NOAA Space Weather Prediction Center products captured 2026-09-06T18:04Z. U.S. Government work, not subject to domestic copyright."
+  },
+  {
+    "id": "three-scales-not-one",
+    "title": "G, R and S are three scales, not one storm score",
+    "question": "The app shows G, R and S levels. Are they three views of the same storm?",
+    "steps": [
+      {
+        "prompt": "Open the space weather scales panel and read today's row (06 September, current). All three domains — G (geomagnetic storm), R (radio blackout) and S (radiation storm) — read 0. A published 0 means NOAA is reporting \"none\", not that the value is missing.",
+        "focus_series": null,
+        "select_time": null,
+        "view": "observatory"
+      },
+      {
+        "prompt": "Now read the previous day's row (05 September). S reads 1 (minor) while G and R both stayed at 0 that day. Check the bulletins panel for the matching summary: a proton event exceeded 10 pfu from 16:15 to 21:35 UTC, peaking at 18 pfu — a real radiation storm, on its own, with no matching geomagnetic or radio event.",
+        "focus_series": null,
+        "select_time": null,
+        "view": "observatory"
+      },
+      {
+        "prompt": "Look at the forecast rows. A watch bulletin predicts G1 (minor) for 08 September — driven by coronal mass ejections from 05 September, the same day as the radiation storm, but a separate mechanism with its own separate scale entry three days later.",
+        "focus_series": null,
+        "select_time": null,
+        "view": "observatory"
+      },
+      {
+        "prompt": "Notice R's forecast carries nonzero probabilities (a minor-event chance and a smaller major-event chance) for the same days G is forecast at 1 — a stated chance is not an observed level, and R has not actually reached 1 in this window.",
+        "focus_series": null,
+        "select_time": null,
+        "view": "observatory"
+      }
+    ],
+    "explanation": "G, R and S each answer a different physical question, measured a different way: G tracks geomagnetic disturbance from solar wind and CMEs coupling with Earth's field; R tracks flare X-rays disturbing the sunlit ionosphere, within minutes of the flare; S tracks energetic protons accelerated toward Earth, which can arrive hours after their source. Because the mechanisms, timescales and instruments differ, NOAA scores them on three independent 0–5 scales rather than folding them into one storm index — a high number on one says nothing about the others. In this real week they told three different stories: a minor radiation storm on 05 September, a quiet 06 September, and a minor geomagnetic watch for 08 September — not one event graded three ways, but three separate ones.",
+    "sources": [
+      "https://www.spaceweather.gov/noaa-scales-explanation",
+      "https://www.spaceweather.gov/products/alerts-watches-and-warnings"
+    ],
+    "dataset": "frozen-2026-09-06",
+    "attribution": "Frozen demonstration dataset: NOAA Space Weather Prediction Center products captured 2026-09-06T18:04Z. U.S. Government work, not subject to domestic copyright."
   }
 ]

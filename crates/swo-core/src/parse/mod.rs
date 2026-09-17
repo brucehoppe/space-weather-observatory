@@ -11,6 +11,7 @@ pub mod kp;
 pub mod ovation;
 pub mod rtsw;
 pub mod scales;
+pub mod solar_cycle;
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use thiserror::Error;

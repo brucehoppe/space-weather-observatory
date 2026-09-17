@@ -105,6 +105,26 @@ export interface ThreeDayForecast {
   source_url: string;
 }
 
+export interface ObservedMonth {
+  month: string;
+  ssn: number;
+  smoothed_ssn: number | null;
+  observed_swpc_ssn: number | null;
+  smoothed_swpc_ssn: number | null;
+  f10_7: number | null;
+  smoothed_f10_7: number | null;
+}
+
+export interface PredictedMonth {
+  month: string;
+  predicted_ssn: number;
+  high_ssn: number;
+  low_ssn: number;
+  predicted_f10_7: number;
+  high_f10_7: number;
+  low_f10_7: number;
+}
+
 export interface AuroraMeta {
   observation_time: string;
   forecast_time: string;
@@ -145,6 +165,8 @@ export interface Dashboard {
   three_day_geomag: ThreeDayForecast | null;
   aurora: AuroraMeta | null;
   statements: Statement[];
+  solar_cycle_observed: ObservedMonth[];
+  solar_cycle_predicted: PredictedMonth[];
 }
 
 export interface AuroraGrid {

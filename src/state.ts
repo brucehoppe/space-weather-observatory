@@ -14,6 +14,19 @@ export interface Selection {
   pinned: boolean;
 }
 
+export type SunPassband = "aia193" | "aia304";
+
+/** One passband's loaded sequence, for the play/pause filmstrip in Sources.
+ *  Playback never starts on its own — `playing` is only ever set true by an
+ *  explicit user click, so this never becomes ambient motion. */
+export interface SunSequenceState {
+  frames: SunImage[];
+  index: number;
+  playing: boolean;
+  loading: boolean;
+  error: string | null;
+}
+
 export interface AppState {
   view: ViewName;
   dashboard: Dashboard | null;
@@ -23,6 +36,7 @@ export interface AppState {
   lessons: Lesson[];
   sunImages: SunImage[];
   imageryError: string | null;
+  sunSequences: Partial<Record<SunPassband, SunSequenceState>>;
   selection: Selection;
   /** Displayed interval, epoch milliseconds. */
   range: { start: number; end: number };
@@ -57,6 +71,7 @@ export function initialState(): AppState {
     lessons: [],
     sunImages: [],
     imageryError: null,
+    sunSequences: {},
     selection: { time: now, pinned: false },
     range: { start: now - 6 * 3600_000, end: now },
     paused: false,

@@ -12,7 +12,7 @@
 │ snapshot.rs   assemble() → Dashboard; per-product degradation; provenance on every series  │
 │ commands.rs   get_dashboard · refresh · settings · evaluate_alert · replay/demo · export   │
 │ imagery.rs    Helioviewer metadata + image, acquisition time preserved                     │
-│ demo.rs / lessons.rs   frozen real dataset · labelled synthetic scenarios · 3 lessons      │
+│ demo.rs / lessons.rs   frozen real dataset · labelled synthetic scenarios · 4 lessons      │
 └───────────────────────────────▲───────────────────────────────────────────────────────────┘
                                 │ pure types and functions, no I/O
 ┌───────────────────────────────┴────────── crates/swo-core ────────────────────────────────┐

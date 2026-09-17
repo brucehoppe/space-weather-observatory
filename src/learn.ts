@@ -1,4 +1,4 @@
-/** The Learn view: three lessons over the frozen demonstration dataset, plus
+/** The Learn view: four lessons over the frozen demonstration dataset, plus
  *  the labelled synthetic alert scenarios (spec §9, §13B). */
 import { button, el } from "./dom";
 import { fmtDuration, fmtUtc } from "./format";

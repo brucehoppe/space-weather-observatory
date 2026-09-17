@@ -72,6 +72,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
     case "clear_cache":
       return mockInvoke<T>("cache_status");
     case "get_sun_images":
+    case "get_sun_image_sequence":
       throw new Error("solar imagery is not available in browser preview");
     case "evaluate_scenario":
       throw new Error("scenario evaluation runs in the desktop backend");

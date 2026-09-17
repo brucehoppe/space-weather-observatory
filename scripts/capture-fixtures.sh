@@ -19,4 +19,6 @@ get https://services.swpc.noaa.gov/products/alerts.json                  alerts.
 get https://services.swpc.noaa.gov/json/ovation_aurora_latest.json       ovation_aurora_latest.json
 get https://services.swpc.noaa.gov/text/3-day-forecast.txt               3-day-forecast.txt
 get https://services.swpc.noaa.gov/text/3-day-geomag-forecast.txt        3-day-geomag-forecast.txt
+get https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json observed_solar_cycle_indices.json
+get https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json predicted_solar_cycle.json
 echo "capture complete: $(date -u +%Y-%m-%dT%H:%M:%SZ)"

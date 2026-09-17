@@ -26,6 +26,12 @@ export const acknowledgeEpisode = (episodeId: string) =>
   invoke<void>("acknowledge_episode", { episodeId });
 export const getAuroraGrid = () => invoke<AuroraGrid>("get_aurora_grid");
 export const getSunImages = (at?: string) => invoke<SunImage[]>("get_sun_images", { at: at ?? null });
+export const getSunImageSequence = (
+  passband: "aia193" | "aia304",
+  frames: number,
+  stepMinutes: number,
+  at?: string,
+) => invoke<SunImage[]>("get_sun_image_sequence", { passband, frames, stepMinutes, at: at ?? null });
 export const listSnapshots = (product: string, limit?: number) =>
   invoke<SnapshotRef[]>("list_snapshots", { product, limit: limit ?? null });
 export const enterReplay = (snapshotIds: number[]) =>

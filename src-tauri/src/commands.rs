@@ -359,6 +359,43 @@ pub async fn get_sun_images(
     Ok(out)
 }
 
+/// Fetch a short backward-looking sequence of frames for one passband, for
+/// play/pause animation. Frames are fetched one at a time at explicit,
+/// evenly-spaced instants ending at `at` (or now) — never the live-refreshing
+/// "latest" frame mid-sequence, so playback cannot show two different moments
+/// under the same requested instant. `frames` and `step_minutes` are clamped
+/// to `imagery::MIN_SEQUENCE_FRAMES..=MAX_SEQUENCE_FRAMES` and a minimum step.
+#[tauri::command]
+pub async fn get_sun_image_sequence(
+    state: State<'_, AppState>,
+    passband: Passband,
+    frames: u32,
+    step_minutes: i64,
+    at: Option<DateTime<Utc>>,
+) -> CmdResult<Vec<SunImage>> {
+    let now = Utc::now();
+    let end = at.unwrap_or(now);
+    let mut out = Vec::new();
+    let mut errors = Vec::new();
+    for instant in imagery::sequence_instants(end, frames, step_minutes) {
+        match imagery::fetch_image(&state.fetcher, passband, instant, now).await {
+            Ok(img) => out.push(img),
+            Err(e) => errors.push(format!("{instant}: {e}")),
+        }
+    }
+    // Helioviewer's nearest-frame lookup can resolve adjacent requested
+    // instants to the same archived image; collapsing runs of the same
+    // provider id avoids a "playback" that visibly repeats a frame.
+    out.dedup_by(|a, b| a.provider_image_id == b.provider_image_id);
+    if out.is_empty() {
+        return Err(format!(
+            "solar imagery sequence unavailable ({})",
+            errors.join("; ")
+        ));
+    }
+    Ok(out)
+}
+
 // --- Replay ------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -610,6 +647,9 @@ fn product_page(p: Product) -> Option<String> {
             Product::ThreeDayGeomagForecast => {
                 "https://www.spaceweather.gov/products/3-day-geomagnetic-forecast"
             }
+            Product::SolarCycleObserved | Product::SolarCyclePredicted => {
+                "https://www.spaceweather.gov/products/solar-cycle-progression"
+            }
         }
         .to_string(),
     )
@@ -628,6 +668,8 @@ fn product_description(p: Product) -> &'static str {
         Product::Aurora => "OVATION aurora model grid with its own observation and forecast times.",
         Product::ThreeDayForecast => "NOAA 3-day forecast: Kp breakdown, radio and radiation outlook.",
         Product::ThreeDayGeomagForecast => "NOAA 3-day geomagnetic forecast: Ap, probabilities and Kp breakdown.",
+        Product::SolarCycleObserved => "Solar Cycle 25 observed monthly sunspot number and F10.7 radio flux.",
+        Product::SolarCyclePredicted => "Official consensus panel prediction for Solar Cycle 25, with its stated expected range.",
     }
 }
 

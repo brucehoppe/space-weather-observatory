@@ -44,10 +44,12 @@ pub enum Product {
     Aurora,
     ThreeDayForecast,
     ThreeDayGeomagForecast,
+    SolarCycleObserved,
+    SolarCyclePredicted,
 }
 
 impl Product {
-    pub const ALL: [Product; 11] = [
+    pub const ALL: [Product; 13] = [
         Product::SolarWindPlasma,
         Product::SolarWindMag,
         Product::GoesXray,
@@ -59,6 +61,8 @@ impl Product {
         Product::Aurora,
         Product::ThreeDayForecast,
         Product::ThreeDayGeomagForecast,
+        Product::SolarCycleObserved,
+        Product::SolarCyclePredicted,
     ];
 
     pub fn key(self) -> &'static str {
@@ -74,6 +78,8 @@ impl Product {
             Product::Aurora => "ovation_aurora_latest",
             Product::ThreeDayForecast => "three_day_forecast",
             Product::ThreeDayGeomagForecast => "three_day_geomag_forecast",
+            Product::SolarCycleObserved => "solar_cycle_observed",
+            Product::SolarCyclePredicted => "solar_cycle_predicted",
         }
     }
 
@@ -90,6 +96,8 @@ impl Product {
             Product::Aurora => parse::ovation::URL,
             Product::ThreeDayForecast => parse::forecast_text::THREE_DAY_URL,
             Product::ThreeDayGeomagForecast => parse::forecast_text::GEOMAG_URL,
+            Product::SolarCycleObserved => parse::solar_cycle::OBSERVED_URL,
+            Product::SolarCyclePredicted => parse::solar_cycle::PREDICTED_URL,
         }
     }
 
@@ -110,6 +118,8 @@ impl Product {
             Product::ThreeDayForecast | Product::ThreeDayGeomagForecast => 1800,
             // Instrument assignment changes rarely.
             Product::GoesInstrumentSources => 3600,
+            // Monthly-granularity indices; revised occasionally, not hourly.
+            Product::SolarCycleObserved | Product::SolarCyclePredicted => 21600,
         }
     }
 
@@ -136,6 +146,8 @@ impl Product {
                 | Product::ThreeDayForecast
                 | Product::ThreeDayGeomagForecast
                 | Product::GoesInstrumentSources
+                | Product::SolarCycleObserved
+                | Product::SolarCyclePredicted
         )
     }
 }

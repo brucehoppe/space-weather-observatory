@@ -43,8 +43,8 @@ macro_rules! fixture {
 
 /// The frozen payloads, in the same shape the live path produces.
 pub fn payloads() -> crate::snapshot::Payloads {
-    use swo_core::parse::{bulletins, forecast_text, goes, kp, ovation, rtsw, scales};
-    let entries: [(Product, &str, &str); 11] = [
+    use swo_core::parse::{bulletins, forecast_text, goes, kp, ovation, rtsw, scales, solar_cycle};
+    let entries: [(Product, &str, &str); 13] = [
         (
             Product::SolarWindPlasma,
             fixture!("rtsw_wind_1m.json"),
@@ -95,6 +95,16 @@ pub fn payloads() -> crate::snapshot::Payloads {
             Product::ThreeDayGeomagForecast,
             fixture!("3-day-geomag-forecast.txt"),
             forecast_text::GEOMAG_URL,
+        ),
+        (
+            Product::SolarCycleObserved,
+            fixture!("observed_solar_cycle_indices.json"),
+            solar_cycle::OBSERVED_URL,
+        ),
+        (
+            Product::SolarCyclePredicted,
+            fixture!("predicted_solar_cycle.json"),
+            solar_cycle::PREDICTED_URL,
         ),
     ];
     entries

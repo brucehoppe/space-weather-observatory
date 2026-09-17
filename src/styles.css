@@ -362,6 +362,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .table th, .table td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 .table th { color: var(--fg-muted); font-weight: 600; }
 .table code { font-family: var(--mono); font-size: 11px; color: var(--fg-muted); word-break: break-all; }
+.scale-cell { line-height: 1.35; }
+.scale-cell strong { font-family: var(--mono); }
+.sequence-controls { margin-top: 0.4rem; }
 
 .lesson { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-panel); padding: 0.7rem 0.8rem; margin-bottom: 0.7rem; }
 .lesson .steps { counter-reset: step; list-style: none; padding: 0; margin: 0.5rem 0; }

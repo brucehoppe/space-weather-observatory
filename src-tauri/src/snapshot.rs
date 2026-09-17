@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use swo_core::interpret::{self, Basis, Statement};
 use swo_core::model::*;
-use swo_core::parse::{self, bulletins, forecast_text, goes, kp, ovation, rtsw, scales};
+use swo_core::parse::{self, bulletins, forecast_text, goes, kp, ovation, rtsw, scales, solar_cycle};
 
 use crate::providers::Product;
 use crate::store::Snapshot as StoredSnapshot;
@@ -52,6 +52,12 @@ pub struct Dashboard {
     pub aurora: Option<AuroraMeta>,
     /// Plain-language statements, each traceable to its rule version + source.
     pub statements: Vec<Statement>,
+    /// Solar Cycle 25 progression: observed monthly indices and the official
+    /// consensus prediction panel, kept as two independent lists (each empty
+    /// when its own product is unavailable) since one can be present without
+    /// the other.
+    pub solar_cycle_observed: Vec<solar_cycle::ObservedMonth>,
+    pub solar_cycle_predicted: Vec<solar_cycle::PredictedMonth>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -462,6 +468,49 @@ pub fn assemble(
         geomag_err,
     ));
 
+    // --- Solar Cycle 25 progression -----------------------------------------
+    let mut solar_cycle_observed = Vec::new();
+    let mut observed_err = None;
+    if let Some(stored) = payloads.get(Product::SolarCycleObserved.key()) {
+        match solar_cycle::parse_observed(&stored.payload) {
+            Ok(months) => solar_cycle_observed = months,
+            Err(e) => observed_err = Some(e.to_string()),
+        }
+    }
+    statuses.push(status(
+        Product::SolarCycleObserved,
+        payloads.get(Product::SolarCycleObserved.key()),
+        solar_cycle_observed.last().map(|m| {
+            m.month
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc()
+        }),
+        now,
+        observed_err,
+    ));
+
+    let mut solar_cycle_predicted = Vec::new();
+    let mut predicted_err = None;
+    if let Some(stored) = payloads.get(Product::SolarCyclePredicted.key()) {
+        match solar_cycle::parse_predicted(&stored.payload) {
+            Ok(months) => solar_cycle_predicted = months,
+            Err(e) => predicted_err = Some(e.to_string()),
+        }
+    }
+    statuses.push(status(
+        Product::SolarCyclePredicted,
+        payloads.get(Product::SolarCyclePredicted.key()),
+        solar_cycle_predicted.last().map(|m| {
+            m.month
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc()
+        }),
+        now,
+        predicted_err,
+    ));
+
     // --- Aurora metadata ---------------------------------------------------
     let mut aurora = None;
     let mut aurora_err = None;
@@ -530,6 +579,8 @@ pub fn assemble(
         three_day_geomag,
         aurora,
         statements,
+        solar_cycle_observed,
+        solar_cycle_predicted,
     }
 }
 
@@ -563,7 +614,7 @@ mod tests {
 
     fn fixture_payloads(now: DateTime<Utc>) -> Payloads {
         let mut p = Payloads::new();
-        let files: [(Product, &str, &str); 8] = [
+        let files: [(Product, &str, &str); 10] = [
             (
                 Product::SolarWindPlasma,
                 "rtsw_wind_1m.json",
@@ -587,6 +638,16 @@ mod tests {
                 Product::ThreeDayForecast,
                 "3-day-forecast.txt",
                 forecast_text::THREE_DAY_URL,
+            ),
+            (
+                Product::SolarCycleObserved,
+                "observed_solar_cycle_indices.json",
+                solar_cycle::OBSERVED_URL,
+            ),
+            (
+                Product::SolarCyclePredicted,
+                "predicted_solar_cycle.json",
+                solar_cycle::PREDICTED_URL,
             ),
         ];
         for (product, file, url) in files {
@@ -628,6 +689,44 @@ mod tests {
         assert!(d.aurora.is_some());
         assert!(d.three_day.is_some());
         assert!(!d.bulletins.is_empty());
+        assert!(!d.solar_cycle_observed.is_empty());
+        assert!(!d.solar_cycle_predicted.is_empty());
+    }
+
+    #[test]
+    fn solar_cycle_progression_assembles_with_status() {
+        let d = assemble(
+            Mode::Live,
+            &fixture_payloads(capture_time()),
+            capture_time(),
+            "t".into(),
+        );
+        assert!(d.solar_cycle_observed.len() > 1000);
+        assert!(!d.solar_cycle_predicted.is_empty());
+        let observed_status = d
+            .statuses
+            .iter()
+            .find(|s| s.product == Product::SolarCycleObserved.key())
+            .expect("observed status recorded");
+        assert_eq!(observed_status.state, FeedState::Ok);
+        let predicted_status = d
+            .statuses
+            .iter()
+            .find(|s| s.product == Product::SolarCyclePredicted.key())
+            .expect("predicted status recorded");
+        assert_eq!(predicted_status.state, FeedState::Ok);
+    }
+
+    #[test]
+    fn a_missing_solar_cycle_product_leaves_it_empty_not_the_dashboard_broken() {
+        let mut payloads = fixture_payloads(capture_time());
+        payloads.remove(Product::SolarCycleObserved.key());
+        payloads.remove(Product::SolarCyclePredicted.key());
+        let d = assemble(Mode::Live, &payloads, capture_time(), "t".into());
+        assert!(d.solar_cycle_observed.is_empty());
+        assert!(d.solar_cycle_predicted.is_empty());
+        // The rest of the dashboard is unaffected by these two being absent.
+        assert!(d.series.contains_key("noaa-swpc:rtsw_wind_1m:proton_speed"));
     }
 
     #[test]

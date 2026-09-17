@@ -147,6 +147,24 @@ pub async fn fetch_image(
     })
 }
 
+/// Bounds for a requested image sequence: enough to show real change over a
+/// few hours without hammering the provider with a long backward scan.
+pub const MIN_SEQUENCE_FRAMES: u32 = 2;
+pub const MAX_SEQUENCE_FRAMES: u32 = 12;
+pub const MIN_SEQUENCE_STEP_MINUTES: i64 = 10;
+
+/// The explicit instants a sequence request resolves to, oldest first ending
+/// at `end`. Kept separate from the network call so the spacing rule is
+/// testable without a fetcher.
+pub fn sequence_instants(end: DateTime<Utc>, frames: u32, step_minutes: i64) -> Vec<DateTime<Utc>> {
+    let frames = frames.clamp(MIN_SEQUENCE_FRAMES, MAX_SEQUENCE_FRAMES);
+    let step_minutes = step_minutes.max(MIN_SEQUENCE_STEP_MINUTES);
+    (0..frames)
+        .rev()
+        .map(|i| end - Duration::minutes(step_minutes * i64::from(i)))
+        .collect()
+}
+
 /// Minimal base64 encoder: avoids a dependency for one small use.
 fn base64(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -233,5 +251,31 @@ mod tests {
     #[test]
     fn imagery_hosts_are_on_the_allow_list() {
         crate::providers::check_host(API_BASE).unwrap();
+    }
+
+    #[test]
+    fn sequence_instants_are_evenly_spaced_ending_exactly_at_the_requested_time() {
+        let end = Utc::now();
+        let instants = sequence_instants(end, 6, 30);
+        assert_eq!(instants.len(), 6);
+        assert_eq!(*instants.last().unwrap(), end);
+        for pair in instants.windows(2) {
+            assert_eq!(pair[1] - pair[0], Duration::minutes(30));
+        }
+    }
+
+    #[test]
+    fn sequence_frame_count_and_step_are_clamped_not_silently_ignored() {
+        let end = Utc::now();
+        assert_eq!(sequence_instants(end, 0, 30).len(), MIN_SEQUENCE_FRAMES as usize);
+        assert_eq!(
+            sequence_instants(end, 999, 30).len(),
+            MAX_SEQUENCE_FRAMES as usize
+        );
+        let instants = sequence_instants(end, 2, 1);
+        assert_eq!(
+            instants[1] - instants[0],
+            Duration::minutes(MIN_SEQUENCE_STEP_MINUTES)
+        );
     }
 }

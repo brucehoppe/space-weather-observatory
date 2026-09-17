@@ -7,7 +7,7 @@ import {
 } from "./format";
 import type { AppState } from "./state";
 import { datasetNow, INTERVAL_PRESETS } from "./state";
-import type { Dashboard, Observation, ProductStatus, Series, Statement } from "./types";
+import type { Dashboard, DomainStatus, Observation, ProductStatus, Series, Statement } from "./types";
 import { SERIES } from "./types";
 
 // --- Readings strip -----------------------------------------------------------
@@ -326,9 +326,66 @@ export function renderSidePanel(
 
   panel.append(renderSelectionDetail(state, chart, onExport, onExportChart, onExportChartSvg));
   panel.append(renderStatuses(d, state));
+  panel.append(renderScales(d));
   panel.append(renderOutlook(d));
   panel.append(renderBulletins(d));
   return panel;
+}
+
+const SCALE_DOMAIN_LABEL: Record<string, string> = {
+  G: "Geomagnetic storm (G)",
+  R: "Radio blackout (R)",
+  S: "Radiation storm (S)",
+};
+
+function scaleCell(status: DomainStatus): HTMLElement {
+  const level = status.scale ? `${status.scale.domain}${status.scale.level}` : "—";
+  const text = status.text ?? (status.scale ? "" : "not published");
+  const probs = status.probabilities.length
+    ? status.probabilities.map(([label, v]) => `${label}: ${v}%`).join(", ")
+    : null;
+  return el("div", { class: "scale-cell" },
+    el("strong", {}, level),
+    text ? el("span", {}, ` ${text}`) : null,
+    probs ? el("div", { class: "note" }, probs) : null,
+  );
+}
+
+function renderScales(d: Dashboard): HTMLElement {
+  const section = el("section", { "aria-label": "NOAA space weather scales" });
+  section.append(el("h2", {}, "Space weather scales (G / R / S)"));
+  if (!d.scales.length) {
+    section.append(el("p", { class: "note" },
+      "Scale status unavailable. That is a gap in information, not evidence of quiet conditions."));
+    return section;
+  }
+  const days = [...d.scales].sort((a, b) => a.day_offset - b.day_offset);
+  const table = el("table", { class: "table" },
+    el("tr", {},
+      el("th", {}, "Day"),
+      el("th", { title: SCALE_DOMAIN_LABEL["G"]! }, "G"),
+      el("th", { title: SCALE_DOMAIN_LABEL["R"]! }, "R"),
+      el("th", { title: SCALE_DOMAIN_LABEL["S"]! }, "S"),
+    ));
+  for (const day of days) {
+    const label = day.day_offset === 0 ? "Current"
+      : day.day_offset < 0 ? `${day.day_offset} (previous)`
+      : `+${day.day_offset} (forecast)`;
+    table.append(el("tr", {},
+      el("td", {}, label, day.time ? el("div", { class: "note" }, fmtUtc(day.time)) : null),
+      el("td", {}, scaleCell(day.g)),
+      el("td", {}, scaleCell(day.r)),
+      el("td", {}, scaleCell(day.s)),
+    ));
+  }
+  section.append(table);
+  section.append(el("p", { class: "note" },
+    "Three independent domains, each on NOAA's own 0–5 scale: geomagnetic storms (G) affect aurora, power grids " +
+    "and satellite navigation; radio blackouts (R) affect HF radio; radiation storms (S) affect satellite " +
+    "electronics and radiation exposure at high altitude. A level in one domain says nothing about the others."));
+  section.append(el("p", { class: "note" },
+    "See ", el("a", { href: "https://www.spaceweather.gov/noaa-scales-explanation", target: "_blank", rel: "noreferrer" }, "NOAA's scale definitions"), "."));
+  return section;
 }
 
 function renderSelectionDetail(

@@ -3,6 +3,12 @@
 **Verified:** 2026-09-06 (UTC), by direct request from the development machine.
 Fixtures captured at 2026-09-06T18:04:33Z with `scripts/capture-fixtures.sh`.
 
+**Solar cycle products added 2026-09-17**, verified the same way (product page → linked
+endpoint → payload inspected): `observed_solar_cycle_indices.json` and
+`predicted_solar_cycle.json`, captured 2026-09-17 and added to `fixtures/captured/`. All
+other rows below remain from the 2026-09-06 capture; re-run `scripts/capture-fixtures.sh`
+to refresh everything at once.
+
 Every product below was resolved by opening the official product page and following its
 own links to the machine-readable service at `https://services.swpc.noaa.gov/`, then
 fetching the endpoint and inspecting the actual payload. Nothing was guessed from a
@@ -26,6 +32,8 @@ Re-run `scripts/capture-fixtures.sh` and update this date whenever a contract is
 | OVATION aurora | https://www.spaceweather.gov/products/aurora-30-minute-forecast | `https://services.swpc.noaa.gov/json/ovation_aurora_latest.json` | ~5 min | `Data Format: [Longitude, Latitude, Aurora]`; 360 × 181 cells, lon 0–359 E, lat −90..90; value = % probability of visible aurora in cell | Both `Observation Time` and `Forecast Time` preserved; lead time read from the product (varies; not a fixed 30 min). |
 | 3-day forecast | https://www.spaceweather.gov/products/3-day-forecast | `https://services.swpc.noaa.gov/text/3-day-forecast.txt` | few times/day | text; `:Issued:` line; Kp breakdown table with `(G1)` annotations | Period read from the table; horizons beyond it are *unavailable*, never extrapolated. |
 | 3-day geomagnetic forecast | https://www.spaceweather.gov/products/3-day-geomagnetic-forecast | `https://services.swpc.noaa.gov/text/3-day-geomag-forecast.txt` | daily | text; Ap, probabilities, Kp table | Own issue time, distinct from the 3-day forecast. |
+| Solar cycle — observed | https://www.spaceweather.gov/products/solar-cycle-progression | `https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json` | monthly | international SSN, NOAA provisional SSN, F10.7, each with a smoothed variant | `-1` sentinel → *missing*. History extends to 1749; `observed_swpc_ssn` and `f10.7` are absent for most of that history and become real only in recent decades (confirmed against the captured fixture: negative in 2976/3332 and 3069/3332 rows respectively). |
+| Solar cycle — predicted | same page | `https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json` | monthly | official consensus panel's `predicted`/`high`/`low` SSN and F10.7 | The panel's own stated expected range, not a computed confidence interval; never re-derived. |
 
 Timestamp shapes observed and handled (all UTC): `2026-09-06T17:55:00Z`, `2026-09-06T17:57:00` (no marker),
 `2026-09-06 12:12:15.890`, `2026 Sep 06 1212 UTC`.

@@ -11,7 +11,7 @@ import * as ipc from "./ipc";
 import { renderLearnView } from "./learn";
 import { buildPanels, renderMeaning, renderReadings, renderSidePanel, renderTimeline } from "./observatory";
 import { renderSourcesView } from "./sources";
-import { datasetNow, Store, type ViewName } from "./state";
+import { datasetNow, Store, type SunPassband, type ViewName } from "./state";
 import type { Lesson } from "./types";
 import { SERIES } from "./types";
 import { snapshotsAt } from "./replay";
@@ -70,7 +70,11 @@ function render(): void {
       onResetLesson: resetLesson,
       onNavigate: navigate,
     }));
-    if (state.view === "sources") container.append(renderSourcesView(state));
+    if (state.view === "sources") container.append(renderSourcesView(state, {
+      onLoadSequence: loadSunSequence,
+      onTogglePlayback: toggleSunSequence,
+      onStepFrame: stepSunSequence,
+    }));
     root!.append(container);
   }
 
@@ -346,7 +350,7 @@ async function openReplayPicker(): Promise<void> {
       open.disabled = true;
       void ipc.enterReplay(snapshotsAt(snapshots, Date.parse(select.value))).then((dashboard) => {
         imageryRequest++;
-        store.set({ paused: true, activeLesson: null, sunImages: [], imageryError: "Solar imagery is unavailable for this saved replay." });
+        store.set({ paused: true, activeLesson: null, sunImages: [], sunSequences: {}, imageryError: "Solar imagery is unavailable for this saved replay." });
         applyDashboardForced(dashboard);
         dialog.close();
       }).catch((e: unknown) => { status.textContent = `Could not open replay: ${String(e)}`; open.disabled = false; });
@@ -359,7 +363,7 @@ async function enterDemo(): Promise<void> {
   setShowDismissed(false);
   const dashboard = await ipc.enterDemo();
   imageryRequest++;
-  store.set({ paused: true, sunImages: [], imageryError: "Solar imagery is unavailable for this frozen dataset." });
+  store.set({ paused: true, sunImages: [], sunSequences: {}, imageryError: "Solar imagery is unavailable for this frozen dataset." });
   applyDashboardForced(dashboard);
 }
 
@@ -483,6 +487,81 @@ function loadSunImages(): void {
   });
 }
 
+// --- Sun-image sequence playback -------------------------------------------------
+// Frames are fetched once per passband, at explicit past instants (never the
+// live "latest" frame mid-sequence). Playback only ever starts from an
+// explicit user click (see SunSequenceState), so it is never ambient motion
+// that reduced-motion settings would need to suppress.
+
+const SEQUENCE_FRAMES = 6;
+const SEQUENCE_STEP_MINUTES = 30;
+const SEQUENCE_TICK_MS = 900;
+
+function loadSunSequence(passband: SunPassband): void {
+  const existing = store.get().sunSequences[passband];
+  if (existing?.loading) return;
+  store.set({
+    sunSequences: {
+      ...store.get().sunSequences,
+      [passband]: { frames: [], index: 0, playing: false, loading: true, error: null },
+    },
+  });
+  render();
+  void ipc.getSunImageSequence(passband, SEQUENCE_FRAMES, SEQUENCE_STEP_MINUTES).then((frames) => {
+    store.set({
+      sunSequences: {
+        ...store.get().sunSequences,
+        [passband]: { frames, index: frames.length - 1, playing: false, loading: false, error: null },
+      },
+    });
+    render();
+  }).catch((e: unknown) => {
+    store.set({
+      sunSequences: {
+        ...store.get().sunSequences,
+        [passband]: { frames: [], index: 0, playing: false, loading: false, error: String(e) },
+      },
+    });
+    render();
+  });
+}
+
+function toggleSunSequence(passband: SunPassband): void {
+  const seq = store.get().sunSequences[passband];
+  if (!seq || seq.frames.length < 2) return;
+  store.set({
+    sunSequences: { ...store.get().sunSequences, [passband]: { ...seq, playing: !seq.playing } },
+  });
+  render();
+}
+
+function stepSunSequence(passband: SunPassband, delta: number): void {
+  const seq = store.get().sunSequences[passband];
+  if (!seq || seq.frames.length < 2) return;
+  const index = (seq.index + delta + seq.frames.length) % seq.frames.length;
+  store.set({
+    sunSequences: { ...store.get().sunSequences, [passband]: { ...seq, index, playing: false } },
+  });
+  render();
+}
+
+/** One shared clock advances every currently-playing sequence; cheap to run
+ *  continuously since it is a no-op whenever nothing is playing. */
+function tickSunSequences(): void {
+  const state = store.get();
+  const seqs = state.sunSequences;
+  let changed = false;
+  const next: typeof seqs = { ...seqs };
+  for (const key of Object.keys(seqs) as SunPassband[]) {
+    const seq = seqs[key];
+    if (seq?.playing && seq.frames.length > 1) {
+      next[key] = { ...seq, index: (seq.index + 1) % seq.frames.length };
+      changed = true;
+    }
+  }
+  if (changed) { store.set({ sunSequences: next }); render(); }
+}
+
 // --- Boot -----------------------------------------------------------------------
 
 async function boot(): Promise<void> {
@@ -520,6 +599,8 @@ async function boot(): Promise<void> {
     if (store.get().dashboard?.mode !== "live") return;
     void ipc.getDashboard().then(applyDashboard).catch(() => {});
   }, 60_000);
+
+  window.setInterval(tickSunSequences, SEQUENCE_TICK_MS);
 }
 
 store.subscribe(() => {});

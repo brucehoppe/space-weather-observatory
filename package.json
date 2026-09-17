@@ -27,7 +27,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test src/chart.test.ts src/chart-export.test.ts src/format.test.ts src/replay.test.ts",
     "tauri": "tauri",
-    "build:macos-zip": "tauri build --bundles app && cd \"target/release/bundle/macos\" && rm -f \"Space Weather Observatory.app.zip\" && ditto -c -k --sequesterRsrc --keepParent \"Space Weather Observatory.app\" \"Space Weather Observatory.app.zip\""
+    "build:macos-zip": "tauri build --bundles app && cd \"target/release/bundle/macos\" && rm -f \"Space Weather Observatory.app.zip\" && ditto -c -k --sequesterRsrc --keepParent \"Space Weather Observatory.app\" \"Space Weather Observatory.app.zip\"",
+    "build:windows": "pwsh -File scripts/build-windows.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",

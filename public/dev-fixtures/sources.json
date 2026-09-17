@@ -75,5 +75,19 @@
     "page": "https://www.spaceweather.gov/products/3-day-geomagnetic-forecast",
     "cadence_seconds": 1800,
     "description": "NOAA 3-day geomagnetic forecast: Ap, probabilities and Kp breakdown."
+  },
+  {
+    "product": "solar_cycle_observed",
+    "url": "https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json",
+    "page": "https://www.spaceweather.gov/products/solar-cycle-progression",
+    "cadence_seconds": 21600,
+    "description": "Solar Cycle 25 observed monthly sunspot number and F10.7 radio flux."
+  },
+  {
+    "product": "solar_cycle_predicted",
+    "url": "https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json",
+    "page": "https://www.spaceweather.gov/products/solar-cycle-progression",
+    "cadence_seconds": 21600,
+    "description": "Official consensus panel prediction for Solar Cycle 25, with its stated expected range."
   }
 ]

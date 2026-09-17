@@ -5,10 +5,10 @@ the `.exe` works. Windows verification status is tracked in `docs/release-readin
 
 ## Outputs (Tauri v2 toolchain naming)
 
-- Executable: `src-tauri/target/release/space-weather-observatory.exe`
+- Executable: `target/release/space-weather-observatory.exe`
   (product name "Space Weather Observatory"; rename in `tauri.conf.json` → `productName` if a
   space-free name is preferred for the raw exe).
-- Installer (NSIS, per-user, no admin): `src-tauri/target/release/bundle/nsis/Space Weather Observatory_0.1.0_x64-setup.exe`
+- Installer (NSIS, per-user, no admin): `target/release/bundle/nsis/Space Weather Observatory_0.1.0_x64-setup.exe`
 - SHA-256 checksums: produced by the CI job as `SHA256SUMS.txt` next to the artifacts.
 
 ## Runtime strategy
@@ -32,16 +32,18 @@ Alternative for offline installs: `offlineInstaller` (adds ~150 MB) — change i
 
 ```powershell
 git clone <repo> && cd space-weather-observatory
-npm ci
-cargo test --workspace          # deterministic, fixture-only
-npm run build                   # typecheck + bundle frontend
-npx tauri build                 # produces exe + NSIS installer
-Get-FileHash .\src-tauri\target\release\bundle\nsis\*.exe -Algorithm SHA256
+pwsh -File scripts/build-windows.ps1
 ```
 
-CI: `.github/workflows/windows-release.yml` runs exactly this on `windows-latest` and uploads
-the installer, exe and checksums as workflow artifacts. It is configured but, at the time of
-writing, **has not been run** (see release-readiness).
+`scripts/build-windows.ps1` runs `npm ci`, `cargo test --workspace`, `npm test`,
+`npm run build` and `npx tauri build` in order, then writes SHA-256 checksums next to the
+installer. It is the same script CI runs (see below), so a local run reproduces CI output
+exactly. Outputs land under the workspace-root `target/release/bundle/nsis/` (the Cargo
+workspace is rooted at the repo root, not `src-tauri/`).
+
+CI: `.github/workflows/windows-release.yml` runs `scripts/build-windows.ps1` on
+`windows-latest` and uploads the installer, exe and checksums as workflow artifacts. It is
+configured but, at the time of writing, **has not been run** (see release-readiness).
 
 ## Data locations (never the install folder)
 

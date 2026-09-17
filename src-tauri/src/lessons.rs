@@ -153,6 +153,52 @@ this application does not have and therefore does not pretend to."
             dataset: "frozen-2026-09-06".into(),
             attribution: demo::ATTRIBUTION.into(),
         },
+        Lesson {
+            id: "three-scales-not-one".into(),
+            title: "G, R and S are three scales, not one storm score".into(),
+            question: "The app shows G, R and S levels. Are they three views of the same storm?".into(),
+            steps: vec![
+                LessonStep {
+                    prompt: "Open the space weather scales panel and read today's row (06 September, current). All three domains — G (geomagnetic storm), R (radio blackout) and S (radiation storm) — read 0. A published 0 means NOAA is reporting \"none\", not that the value is missing.".into(),
+                    focus_series: None,
+                    select_time: None,
+                    view: "observatory".into(),
+                },
+                LessonStep {
+                    prompt: "Now read the previous day's row (05 September). S reads 1 (minor) while G and R both stayed at 0 that day. Check the bulletins panel for the matching summary: a proton event exceeded 10 pfu from 16:15 to 21:35 UTC, peaking at 18 pfu — a real radiation storm, on its own, with no matching geomagnetic or radio event.".into(),
+                    focus_series: None,
+                    select_time: None,
+                    view: "observatory".into(),
+                },
+                LessonStep {
+                    prompt: "Look at the forecast rows. A watch bulletin predicts G1 (minor) for 08 September — driven by coronal mass ejections from 05 September, the same day as the radiation storm, but a separate mechanism with its own separate scale entry three days later.".into(),
+                    focus_series: None,
+                    select_time: None,
+                    view: "observatory".into(),
+                },
+                LessonStep {
+                    prompt: "Notice R's forecast carries nonzero probabilities (a minor-event chance and a smaller major-event chance) for the same days G is forecast at 1 — a stated chance is not an observed level, and R has not actually reached 1 in this window.".into(),
+                    focus_series: None,
+                    select_time: None,
+                    view: "observatory".into(),
+                },
+            ],
+            explanation: "G, R and S each answer a different physical question, measured a different way: G tracks \
+geomagnetic disturbance from solar wind and CMEs coupling with Earth's field; R tracks flare X-rays disturbing \
+the sunlit ionosphere, within minutes of the flare; S tracks energetic protons accelerated toward Earth, which \
+can arrive hours after their source. Because the mechanisms, timescales and instruments differ, NOAA scores \
+them on three independent 0–5 scales rather than folding them into one storm index — a high number on one says \
+nothing about the others. In this real week they told three different stories: a minor radiation storm on 05 \
+September, a quiet 06 September, and a minor geomagnetic watch for 08 September — not one event graded three \
+ways, but three separate ones."
+                .into(),
+            sources: vec![
+                "https://www.spaceweather.gov/noaa-scales-explanation".into(),
+                "https://www.spaceweather.gov/products/alerts-watches-and-warnings".into(),
+            ],
+            dataset: "frozen-2026-09-06".into(),
+            attribution: demo::ATTRIBUTION.into(),
+        },
     ]
 }
 
@@ -162,9 +208,9 @@ mod tests {
     use crate::snapshot::{assemble, Mode};
 
     #[test]
-    fn there_are_exactly_three_complete_lessons() {
+    fn there_are_exactly_four_complete_lessons() {
         let l = lessons();
-        assert_eq!(l.len(), 3);
+        assert_eq!(l.len(), 4);
         for lesson in &l {
             assert!(!lesson.question.is_empty());
             assert!(lesson.steps.len() >= 3, "{} has too few steps", lesson.id);
@@ -291,6 +337,56 @@ mod tests {
         assert!(
             max < 5.0,
             "Kp reached {max}; the lesson text would need revising"
+        );
+    }
+
+    #[test]
+    fn the_scales_lesson_matches_the_real_scale_days_in_the_data() {
+        let d = assemble(
+            Mode::Demo,
+            &demo::payloads(),
+            demo::captured_at(),
+            "demo".into(),
+        );
+        let today = d
+            .scales
+            .iter()
+            .find(|s| s.day_offset == 0)
+            .expect("day 0 exists");
+        assert_eq!(today.g.scale.map(|s| s.level), Some(0));
+        assert_eq!(today.r.scale.map(|s| s.level), Some(0));
+        assert_eq!(today.s.scale.map(|s| s.level), Some(0));
+
+        let yesterday = d
+            .scales
+            .iter()
+            .find(|s| s.day_offset == -1)
+            .expect("the previous day is published");
+        assert_eq!(
+            yesterday.s.scale.map(|s| s.level),
+            Some(1),
+            "the lesson quotes an S1 event on the previous day"
+        );
+        assert_eq!(
+            yesterday.g.scale.map(|s| s.level),
+            Some(0),
+            "the lesson claims G stayed at 0 that day"
+        );
+        assert_eq!(
+            yesterday.r.scale.map(|s| s.level),
+            Some(0),
+            "the lesson claims R stayed at 0 that day"
+        );
+
+        let day3 = d
+            .scales
+            .iter()
+            .find(|s| s.day_offset == 3)
+            .expect("a three-day-ahead forecast row exists");
+        assert_eq!(
+            day3.g.scale.map(|s| s.level),
+            Some(1),
+            "the lesson quotes a G1 forecast three days out"
         );
     }
 }

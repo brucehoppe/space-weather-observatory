@@ -176,6 +176,7 @@ pub fn run() {
             commands::acknowledge_episode,
             commands::get_aurora_grid,
             commands::get_sun_images,
+            commands::get_sun_image_sequence,
             commands::list_snapshots,
             commands::enter_replay,
             commands::enter_demo,

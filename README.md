@@ -5,10 +5,14 @@
 A local, source-grounded desktop application for inspecting solar observations, upstream
 solar wind, geomagnetic conditions and official NOAA SWPC short-term forecasts — with a
 plain-language "What this means for you" layer, a configurable solar-wind alert, an
-official-product aurora view, and three lessons over a frozen real dataset.
+official-product aurora view with sun-image sequence playback, a NOAA G/R/S space weather
+scales panel, Solar Cycle 25 progression against the official consensus prediction, and
+four lessons over a frozen real dataset.
 
 No account, no cloud, no telemetry, no runtime language model. Every number on screen
 carries its provider, instrument, timestamp, quality and source URL.
+
+**New here? See `QUICKSTART.md`** — the fastest path from clone to a running app.
 
 | | |
 |---|---|
@@ -37,8 +41,8 @@ Prerequisites: Rust (stable), Node 24+, and the Tauri platform prerequisites for
 
 ```bash
 npm ci
-cargo test --workspace         # 189 deterministic tests, fixture-only, no network
-npm test                       # 11 frontend unit tests (Node)
+cargo test --workspace         # 199 deterministic tests, fixture-only, no network
+npm test                       # 12 frontend unit tests (Node)
 npm run tauri dev              # desktop app with hot reload
 npm run tauri build            # installer for the current platform
 ```
@@ -59,9 +63,10 @@ then update the date in `docs/sources.md`.
 | `crates/swo-core/` | Pure scientific core: parsers, model, time alignment, aggregation, flux class, alert state machine, interpretation rules, export. No I/O. |
 | `src-tauri/` | Desktop backend: allow-listed acquisition, SQLite cache, snapshot assembly, commands, imagery, demo dataset, lessons. |
 | `src/` | Frontend: shell, chart engine, alert banner, aurora, learn, sources. |
-| `fixtures/captured/` | Verbatim NOAA originals (2026-09-06T18:04Z) used by tests and as the frozen demo dataset. |
+| `fixtures/captured/` | Verbatim NOAA originals (2026-09-06T18:04Z; solar cycle products 2026-09-17) used by tests and as the frozen demo dataset. |
 | `docs/` | `sources.md`, `solar-wind-alert.md`, `architecture.md`, `windows-build.md`, `privacy.md`, `license-proposal.md`, `release-readiness.md`, `implementation-status.md`. |
 | `.github/workflows/` | `ci.yml` (deterministic tests, lint), `windows-release.yml` (x64 installer + SHA-256). |
+| `scripts/` | `capture-fixtures.sh` (refresh captured originals), `build-windows.ps1` (local Windows build, same steps as CI). |
 | `LICENSE`, `THIRD-PARTY.md`, `CONTRIBUTING.md` | Licence, third-party notices, contribution guide. |
 
 ## Configuration reference
