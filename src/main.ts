@@ -20,6 +20,14 @@ const store = new Store();
 let chart: ChartStack | null = null;
 let chartCanvas: HTMLCanvasElement | null = null;
 let imageryRequest = 0;
+// render() rebuilds the whole DOM tree from scratch on every state change
+// (dashboard poll, sequence-playback tick, etc.), including the scrollable
+// view container — a fresh element always starts scrolled to the top. Track
+// the previous view's scroll position across renders so an unrelated state
+// change (e.g. a playing sun-image sequence ticking every 900ms) never
+// yanks the reader back to the top of a long view like Sources.
+let lastRenderedView: ViewName | null = null;
+let lastViewScrollTop = 0;
 
 const root = document.getElementById("app");
 if (!root) throw new Error("application root missing");
@@ -28,6 +36,9 @@ if (!root) throw new Error("application root missing");
 
 function render(): void {
   const state = store.get();
+  const previousScrollView = root!.querySelector<HTMLElement>(".view-scroll");
+  const preservedScrollTop = lastRenderedView === state.view ? (previousScrollView?.scrollTop ?? lastViewScrollTop) : 0;
+
   document.body.classList.toggle("reduced-motion", state.reducedMotion);
   chart?.destroy();
   chart = null;
@@ -62,7 +73,7 @@ function render(): void {
       onReturnToNow: returnToNow,
     }));
   } else {
-    const container = el("div", { style: "min-height:0;overflow:auto;grid-row:span 3" });
+    const container = el("div", { class: "view-scroll", style: "min-height:0;overflow:auto;grid-row:span 3" });
     if (state.view === "aurora") container.append(renderAuroraView(state));
     if (state.view === "learn") container.append(renderLearnView(state, {
       onStartLesson: startLesson,
@@ -76,12 +87,16 @@ function render(): void {
       onStepFrame: stepSunSequence,
     }));
     root!.append(container);
+    container.scrollTop = preservedScrollTop;
   }
 
   root!.append(renderFooter());
   if (state.error) {
     root!.append(el("div", { class: "app-error", role: "alert" }, state.error));
   }
+
+  lastRenderedView = state.view;
+  lastViewScrollTop = preservedScrollTop;
 }
 
 function renderHeader(): HTMLElement {
