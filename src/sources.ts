@@ -45,9 +45,15 @@ export function renderSourcesView(state: AppState, cb: SourcesCallbacks): HTMLEl
       const shownFrame = seq && seq.frames.length ? seq.frames[seq.index] : undefined;
       const shown = shownFrame ?? img;
       wrap.append(el("figure", { style: "margin:0;max-width:320px" },
-        el("img", { src: shown.data_uri, alt: `${shown.label} solar image`, style: "width:100%;border-radius:6px" }),
+        el("img", {
+          src: shown.data_uri,
+          alt: `${shown.label} solar image`,
+          style: "width:100%;border-radius:6px;transition:opacity .25s ease",
+          "data-sun-frame-img": img.passband,
+        }),
         el("figcaption", { class: "note" },
-          `${shown.label} · acquired ${fmtUtc(shown.acquired_at)}`,
+          `${shown.label} · acquired `,
+          el("span", { "data-sun-frame-time": img.passband }, fmtUtc(shown.acquired_at)),
           el("div", {}, shown.false_colour ? "False colour." : "", ` ${shown.description}`),
           el("div", {}, shown.credit)),
         renderSequenceControls(state, cb, img.passband),
@@ -183,7 +189,7 @@ function renderSequenceControls(state: AppState, cb: SourcesCallbacks, passband:
     el("div", { style: "display:flex;gap:.3rem;align-items:center" },
       button(seq.playing ? "Pause" : "Play", () => cb.onTogglePlayback(passband), "ghost"),
       button("◀", () => cb.onStepFrame(passband, -1), "ghost"),
-      el("span", { class: "note" }, `Frame ${seq.index + 1} / ${seq.frames.length}`),
+      el("span", { class: "note", "data-sun-frame-counter": passband }, `Frame ${seq.index + 1} / ${seq.frames.length}`),
       button("▶", () => cb.onStepFrame(passband, 1), "ghost"),
     ),
   );

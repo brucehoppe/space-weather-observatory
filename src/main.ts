@@ -565,7 +565,17 @@ function stepSunSequence(passband: SunPassband, delta: number): void {
 }
 
 /** One shared clock advances every currently-playing sequence; cheap to run
- *  continuously since it is a no-op whenever nothing is playing. */
+ *  continuously since it is a no-op whenever nothing is playing.
+ *
+ *  This patches the affected `<img>`/caption/counter elements in place
+ *  (`setSilently` + direct DOM writes) instead of calling the normal
+ *  render() pipeline. render() tears down and rebuilds the entire view on
+ *  every call; doing that every 900ms visibly flashed the sun-image panel.
+ *  Reusing the same elements and only swapping their content is what makes
+ *  an image sequence read as an animation rather than a slideshow of
+ *  full-page rebuilds. If the Sources view isn't showing (element not
+ *  found), the state still advances silently and the next full render picks
+ *  up the correct frame. */
 function tickSunSequences(): void {
   const state = store.get();
   const seqs = state.sunSequences;
@@ -574,11 +584,30 @@ function tickSunSequences(): void {
   for (const key of Object.keys(seqs) as SunPassband[]) {
     const seq = seqs[key];
     if (seq?.playing && seq.frames.length > 1) {
-      next[key] = { ...seq, index: (seq.index + 1) % seq.frames.length };
+      const index = (seq.index + 1) % seq.frames.length;
+      next[key] = { ...seq, index };
       changed = true;
+      patchSunFrameDom(key, seq.frames[index]!, index, seq.frames.length);
     }
   }
-  if (changed) { store.set({ sunSequences: next }); render(); }
+  if (changed) store.setSilently({ sunSequences: next });
+}
+
+function patchSunFrameDom(passband: SunPassband, frame: import("./types").SunImage, index: number, total: number): void {
+  const img = document.querySelector<HTMLImageElement>(`img[data-sun-frame-img="${passband}"]`);
+  if (img && img.src !== frame.data_uri) {
+    // A short opacity dip-and-recover (the element has a CSS opacity
+    // transition set in sources.ts) reads as a soft dissolve between frames
+    // rather than an instant pixel swap, without the cost of a real
+    // dual-layer crossfade.
+    img.style.opacity = "0.4";
+    img.src = frame.data_uri;
+    requestAnimationFrame(() => { img.style.opacity = "1"; });
+  }
+  const time = document.querySelector<HTMLElement>(`[data-sun-frame-time="${passband}"]`);
+  if (time) time.textContent = fmtUtc(frame.acquired_at);
+  const counter = document.querySelector<HTMLElement>(`[data-sun-frame-counter="${passband}"]`);
+  if (counter) counter.textContent = `Frame ${index + 1} / ${total}`;
 }
 
 // --- Boot -----------------------------------------------------------------------

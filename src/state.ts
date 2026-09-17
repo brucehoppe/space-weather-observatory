@@ -100,6 +100,14 @@ export class Store {
     for (const l of this.listeners) l(this.state);
   }
 
+  /** Update state without notifying listeners (no full re-render). For a
+   *  high-frequency change (e.g. an animation tick) where the caller patches
+   *  the affected DOM directly instead — a full render() tears down and
+   *  rebuilds every element, which visibly flashes when done every frame. */
+  setSilently(patch: Partial<AppState>): void {
+    this.state = { ...this.state, ...patch };
+  }
+
   subscribe(listener: Listener): void {
     this.listeners.push(listener);
   }
