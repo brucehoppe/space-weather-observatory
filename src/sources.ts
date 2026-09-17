@@ -160,7 +160,7 @@ function renderSequenceControls(state: AppState, cb: SourcesCallbacks, passband:
   const wrap = el("div", { class: "sequence-controls" });
 
   if (!seq) {
-    wrap.append(button("Play sequence (last 2.5 h)", () => cb.onLoadSequence(passband), "ghost"));
+    wrap.append(button("Play sequence (last ~22 h)", () => cb.onLoadSequence(passband), "ghost"));
     return wrap;
   }
   if (seq.loading) {

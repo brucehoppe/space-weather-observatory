@@ -508,8 +508,12 @@ function loadSunImages(): void {
 // explicit user click (see SunSequenceState), so it is never ambient motion
 // that reduced-motion settings would need to suppress.
 
-const SEQUENCE_FRAMES = 6;
-const SEQUENCE_STEP_MINUTES = 30;
+// 12 frames 2 hours apart spans 22 hours — the Sun's rotation (~27-day
+// period) and active-region/coronal-hole evolution are essentially
+// invisible over the 2.5 hours a tighter spacing gave; a near-day span
+// makes real, visible change the point of pressing Play.
+const SEQUENCE_FRAMES = 12;
+const SEQUENCE_STEP_MINUTES = 120;
 const SEQUENCE_TICK_MS = 900;
 
 function loadSunSequence(passband: SunPassband): void {
