@@ -62,6 +62,7 @@ then update the date in `docs/sources.md`.
 | `fixtures/captured/` | Verbatim NOAA originals (2026-09-06T18:04Z) used by tests and as the frozen demo dataset. |
 | `docs/` | `sources.md`, `solar-wind-alert.md`, `architecture.md`, `windows-build.md`, `privacy.md`, `license-proposal.md`, `release-readiness.md`, `implementation-status.md`. |
 | `.github/workflows/` | `ci.yml` (deterministic tests, lint), `windows-release.yml` (x64 installer + SHA-256). |
+| `LICENSE`, `THIRD-PARTY.md`, `CONTRIBUTING.md` | Licence, third-party notices, contribution guide. |
 
 ## Configuration reference
 
@@ -88,4 +89,4 @@ Windows `%APPDATA%\SpaceWeatherObservatory\`):
 
 ## Licence
 
-Proposed MIT; not yet applied — see `docs/license-proposal.md`.
+MIT — see `LICENSE`. Third-party notices: `THIRD-PARTY.md`.

@@ -6,6 +6,8 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
 
 [lib]
 # Tauri v2 builds the app as a library so mobile targets and tests can share it.

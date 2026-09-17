@@ -5,6 +5,21 @@
   "type": "module",
   "engines": { "node": ">=24" },
   "description": "Follow the Sun. Understand its influence. A local, source-grounded desktop observatory for space weather.",
+  "license": "MIT",
+  "author": "Bruce Hoppe",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brucehoppe/space-weather-observatory.git"
+  },
+  "keywords": [
+    "space-weather",
+    "solar-wind",
+    "aurora",
+    "noaa",
+    "swpc",
+    "tauri",
+    "desktop"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
