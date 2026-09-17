@@ -12,7 +12,7 @@ import { renderLearnView } from "./learn";
 import { buildPanels, renderMeaning, renderReadings, renderSidePanel, renderTimeline } from "./observatory";
 import { renderSourcesView } from "./sources";
 import { datasetNow, Store, type SunPassband, type ViewName } from "./state";
-import type { Lesson } from "./types";
+import type { Lesson, SunImage } from "./types";
 import { SERIES } from "./types";
 import { snapshotsAt } from "./replay";
 
@@ -516,6 +516,30 @@ const SEQUENCE_FRAMES = 12;
 const SEQUENCE_STEP_MINUTES = 120;
 const SEQUENCE_TICK_MS = 900;
 
+// Keeps every preloaded frame's decoded Image alive for the sequence's
+// lifetime — an unreferenced off-screen Image is eligible for garbage
+// collection, which can drop its decoded bitmap and defeat the point of
+// preloading. Cleared/replaced whenever that passband's sequence reloads.
+const preloadedFrames = new Map<SunPassband, HTMLImageElement[]>();
+
+/** Force every frame's bitmap to be decoded once, off-screen, before
+ *  playback can start. Swapping an `<img>`'s `src` to an already-decoded
+ *  data URI paints on the next frame; swapping to one the browser hasn't
+ *  decoded yet forces a synchronous decode on the animation tick, which is
+ *  exactly the kind of main-thread stall that reads as a jump or stutter —
+ *  reported specifically on Windows/WebView2, where image decode appears to
+ *  be costlier mid-frame than on WebKit. */
+async function preloadFrames(passband: SunPassband, frames: SunImage[]): Promise<void> {
+  const images = frames.map((f) => {
+    const probe = new Image();
+    probe.src = f.data_uri;
+    return probe;
+  });
+  preloadedFrames.set(passband, images);
+  await Promise.all(images.map((probe) =>
+    typeof probe.decode === "function" ? probe.decode().catch(() => {}) : Promise.resolve()));
+}
+
 function loadSunSequence(passband: SunPassband): void {
   const existing = store.get().sunSequences[passband];
   if (existing?.loading) return;
@@ -526,7 +550,8 @@ function loadSunSequence(passband: SunPassband): void {
     },
   });
   render();
-  void ipc.getSunImageSequence(passband, SEQUENCE_FRAMES, SEQUENCE_STEP_MINUTES).then((frames) => {
+  void ipc.getSunImageSequence(passband, SEQUENCE_FRAMES, SEQUENCE_STEP_MINUTES).then(async (frames) => {
+    await preloadFrames(passband, frames);
     store.set({
       sunSequences: {
         ...store.get().sunSequences,
@@ -593,7 +618,7 @@ function tickSunSequences(): void {
   if (changed) store.setSilently({ sunSequences: next });
 }
 
-function patchSunFrameDom(passband: SunPassband, frame: import("./types").SunImage, index: number, total: number): void {
+function patchSunFrameDom(passband: SunPassband, frame: SunImage, index: number, total: number): void {
   const img = document.querySelector<HTMLImageElement>(`img[data-sun-frame-img="${passband}"]`);
   if (img && img.src !== frame.data_uri) {
     // A short opacity dip-and-recover (the element has a CSS opacity
