@@ -16,7 +16,7 @@ jobs:
         with: { node-version: "24", cache: npm }
       - name: Build, test and package
         shell: pwsh
-        run: pwsh -File scripts/build-windows.ps1
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64-release-candidate

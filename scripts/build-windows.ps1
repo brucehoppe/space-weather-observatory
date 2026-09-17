@@ -6,12 +6,14 @@
 # on a Windows machine reproduces exactly what CI produces. Run from the
 # repository root:
 #
-#   pwsh -File scripts/build-windows.ps1
+#   pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1
+#
+# -ExecutionPolicy Bypass is needed on a default Windows install, which
+# blocks unsigned scripts by policy even when run explicitly with -File; it
+# affects only this process, not the machine's persistent policy.
 #
 # Prerequisites: see docs/windows-build.md (Rust MSVC toolchain, Node 20+,
-# Microsoft C++ Build Tools). Requires PowerShell 7+ (pwsh); Windows
-# PowerShell 5.1 also works for everything except the here-string quoting
-# below, which is plain and portable.
+# Microsoft C++ Build Tools). Requires PowerShell 7+ (pwsh).
 
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")

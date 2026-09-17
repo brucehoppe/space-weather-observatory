@@ -32,8 +32,13 @@ Alternative for offline installs: `offlineInstaller` (adds ~150 MB) — change i
 
 ```powershell
 git clone <repo> && cd space-weather-observatory
-pwsh -File scripts/build-windows.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1
 ```
+
+`-ExecutionPolicy Bypass` is needed on a default Windows install (confirmed necessary on a
+real Windows machine): PowerShell blocks running an unsigned local script by policy even
+when invoked explicitly with `-File`. The flag applies only to this one process, not the
+machine's persistent execution policy.
 
 `scripts/build-windows.ps1` runs `npm ci`, `cargo test --workspace`, `npm test`,
 `npm run build` and `npx tauri build` in order, then writes SHA-256 checksums next to the

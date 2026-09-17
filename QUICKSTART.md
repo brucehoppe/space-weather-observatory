@@ -56,8 +56,11 @@ Gatekeeper will warn on first open (right-click → Open to bypass once).
 ```powershell
 git clone <this-repo-url>
 cd space-weather-observatory
-pwsh -File scripts/build-windows.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1
 ```
+
+(`-ExecutionPolicy Bypass` is needed on a default Windows install, which otherwise blocks
+running an unsigned script even with `-File`; it only applies to this one process.)
 
 This runs the full test suite before packaging, then writes the installer plus SHA-256
 checksums to `target/release/bundle/nsis/`. It is exactly what CI runs
@@ -93,3 +96,6 @@ they run against fixtures captured from real NOAA responses in `fixtures/capture
   Corporate proxies/firewalls sometimes block one of these.
 - **Windows build script fails immediately**: confirm you're running `pwsh` (PowerShell 7+),
   not `powershell.exe` (Windows PowerShell 5.1) — some syntax in the script needs 7+.
+- **"running scripts is disabled on this system" / execution policy error**: use the full
+  command above with `-ExecutionPolicy Bypass`. A default Windows install blocks unsigned
+  scripts by policy, even when run explicitly with `-File`.
