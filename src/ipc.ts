@@ -1,6 +1,7 @@
 /** Typed wrappers over the backend command surface. The UI never constructs a
  *  URL or a file path of its own; both come from the backend or a native dialog. */
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { save } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { isDesktopShell, mockInvoke } from "./devMock";
@@ -18,6 +19,13 @@ function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> 
 
 export const getDashboard = () => invoke<Dashboard>("get_dashboard");
 export const refresh = (product?: string) => invoke<Dashboard>("refresh", { product: product ?? null });
+/** Calls `handler` whenever the backend stores new live data (after loading
+ *  the cache at startup and after each product is fetched). No-op in the
+ *  browser preview, whose frozen dataset never changes. */
+export async function onDashboardUpdated(handler: () => void): Promise<void> {
+  if (!isDesktopShell()) return;
+  await listen("dashboard-updated", handler);
+}
 export const getSettings = () => invoke<Settings>("get_settings");
 export const saveSettings = (settings: Settings) => invoke<Settings>("save_settings", { settings });
 export const resetAlertSettings = () => invoke<Settings>("reset_alert_settings");

@@ -11,7 +11,7 @@ use swo_core::alert::{self, AlertMemory, AlertSettings, Evaluation, SettingsErro
 use swo_core::export::{self, ExportMetadata, SeriesMetadata};
 use swo_core::model::Series;
 use swo_core::parse::ovation::AuroraGrid;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::demo::{self, AlertScenario};
 use crate::imagery::{self, Passband, SunImage};
@@ -45,15 +45,24 @@ pub async fn refresh(state: State<'_, AppState>, product: Option<String>) -> Cmd
     Ok(state.dashboard().await)
 }
 
+/// Event telling the UI that live data changed and it should re-read the
+/// dashboard. Without it the UI only learns of startup data on its next poll.
+pub const DASHBOARD_UPDATED: &str = "dashboard-updated";
+
+pub fn notify_dashboard_updated(handle: &AppHandle) {
+    let _ = handle.emit(DASHBOARD_UPDATED, ());
+}
+
 /// Fetch one product and store it. Failures are recorded, never fatal: the
-/// previous snapshot stays in place as last-known-good.
-pub async fn refresh_product(state: &AppState, product: Product) {
+/// previous snapshot stays in place as last-known-good. Returns whether a new
+/// snapshot was stored.
+pub async fn refresh_product(state: &AppState, product: Product) -> bool {
     let now = Utc::now();
     if !state.fetcher.may_attempt(product, now).await {
-        return; // still backing off
+        return false; // still backing off
     }
     let Ok(outcome) = state.fetcher.fetch(product, now).await else {
-        return;
+        return false;
     };
     let stored = {
         let store = state.store.lock().await;
@@ -64,7 +73,10 @@ pub async fn refresh_product(state: &AppState, product: Product) {
             &outcome.body,
         )
     };
-    if let Ok(snapshot) = stored {
+    let Ok(snapshot) = stored else {
+        return false;
+    };
+    {
         let mut live = state.live.write().await;
         if live
             .get(product.key())
@@ -80,6 +92,7 @@ pub async fn refresh_product(state: &AppState, product: Product) {
             settings.cache_limit_mb.saturating_mul(1024 * 1024),
         );
     }
+    true
 }
 
 pub async fn refresh_all(state: &AppState) {
@@ -105,7 +118,9 @@ pub fn start_polling(handle: AppHandle) {
                 let state = handle.state::<AppState>();
                 // Replay must not drive live acquisition, but live acquisition
                 // continues so returning to now is immediate.
-                refresh_product(&state, product).await;
+                if refresh_product(&state, product).await {
+                    notify_dashboard_updated(&handle);
+                }
             }
         });
     }

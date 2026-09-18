@@ -161,7 +161,14 @@ pub fn run() {
                 let state = handle.state::<AppState>();
                 // Offline-first: show cached data immediately, then refresh.
                 state.hydrate_from_cache().await;
-                commands::refresh_all(&state).await;
+                commands::notify_dashboard_updated(&handle);
+                // Tell the UI as each product lands, so the first screen fills
+                // in progressively instead of waiting for the UI's next poll.
+                for product in providers::Product::ALL {
+                    if commands::refresh_product(&state, product).await {
+                        commands::notify_dashboard_updated(&handle);
+                    }
+                }
                 commands::start_polling(handle.clone());
             });
             Ok(())

@@ -649,6 +649,20 @@ async function boot(): Promise<void> {
     render();
   });
 
+  // The backend announces each product as it lands; at startup that is what
+  // fills the first screen, since the reads below usually run before the
+  // backend has loaded its cache or fetched anything. Registered first so no
+  // announcement is missed; bursts are coalesced into one read.
+  let pending: number | undefined;
+  await ipc.onDashboardUpdated(() => {
+    window.clearTimeout(pending);
+    pending = window.setTimeout(() => {
+      const mode = store.get().dashboard?.mode;
+      if (mode && mode !== "live") return;
+      void ipc.getDashboard().then(applyDashboard).catch(() => {});
+    }, 250);
+  }).catch(() => {});
+
   try {
     const [dashboard, settings, sources, lessons] = await Promise.all([
       ipc.getDashboard(),
