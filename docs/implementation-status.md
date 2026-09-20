@@ -54,7 +54,7 @@ and older responses replacing newer in-memory payloads. Added a saved-snapshot p
 selects the newest retained payload per product at or before the chosen retrieval time.
 CI now runs frontend tests on Node 24; Windows artifacts use the workspace target directory.
 
-Validation: 199 Rust tests, 12 frontend tests, production frontend build and strict Clippy pass.
+Validation: 220 Rust tests, 12 frontend tests, production frontend build and strict Clippy pass.
 The browser automation connector reports no available browser; updated UI interactions have
 not been visually verified in this continuation. See release-readiness.md for packaging results.
 

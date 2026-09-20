@@ -35,3 +35,11 @@ Decisions:
 - **Replay** reconstructs *what was published at a retrieval time* (that is what stored
   payloads contain), not revised physical event times.
 - **No network listener, no auto-updater, no tray, no notifications** (spec §10).
+- **Optional `crates/swo-mcp`** is a separate process, never linked into the app. It opens
+  the SQLite cache read-only (WAL, so it never blocks a refresh), parses payloads through
+  `swo-core`, and serves them over MCP on stdio. A language model only supplies wording: the
+  readings table and staleness warning in a saved report are computed in Rust
+  (`reports.rs`), effect statements come from `swo_core::interpret`, and explanations of
+  readings come from a reviewed glossary (`glossary.rs`). A report is "current" while its
+  `data_fingerprint` (hash of the newest product hashes) matches the cache and it is under
+  6 hours old. Its built-in Ollama driver is the crate's only network use, loopback by default.

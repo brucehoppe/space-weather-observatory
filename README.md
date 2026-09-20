@@ -14,6 +14,12 @@ carries its provider, instrument, timestamp, quality and source URL.
 
 **New here? See `QUICKSTART.md`** — the fastest path from clone to a running app.
 
+**Optional: plain-language reports from a local language model.** `swo-mcp` is a separate
+MCP server that lets a model running on your own machine (via Ollama) write a space weather
+report for a general reader, keep it up to date as the data changes, and explain every
+dashboard reading. The desktop app itself still never loads a model. See
+[`docs/local-llm-quickstart.md`](docs/local-llm-quickstart.md).
+
 | | |
 |---|---|
 | Stack | Rust + Tauri v2 + TypeScript (no framework; small canvas chart engine) |
@@ -41,7 +47,7 @@ Prerequisites: Rust (stable), Node 24+, and the Tauri platform prerequisites for
 
 ```bash
 npm ci
-cargo test --workspace         # 199 deterministic tests, fixture-only, no network
+cargo test --workspace         # 220 deterministic tests, fixture-only, no network
 npm test                       # 12 frontend unit tests (Node)
 npm run tauri dev              # desktop app with hot reload
 npm run tauri build            # installer for the current platform
@@ -61,12 +67,13 @@ then update the date in `docs/sources.md`.
 | Path | Purpose |
 |---|---|
 | `crates/swo-core/` | Pure scientific core: parsers, model, time alignment, aggregation, flux class, alert state machine, interpretation rules, export. No I/O. |
+| `crates/swo-mcp/` | Optional MCP server over the cache, read-only: dashboard, Kp, flare, interpretation and explanation tools, saved plain-language reports, and a built-in Ollama driver (`report`, `ask`). Separate process. |
 | `src-tauri/` | Desktop backend: allow-listed acquisition, SQLite cache, snapshot assembly, commands, imagery, demo dataset, lessons. |
 | `src/` | Frontend: shell, chart engine, alert banner, aurora, learn, sources. |
 | `fixtures/captured/` | Verbatim NOAA originals (2026-09-06T18:04Z; solar cycle products 2026-09-17) used by tests and as the frozen demo dataset. |
 | `docs/` | `sources.md`, `solar-wind-alert.md`, `architecture.md`, `windows-build.md`, `privacy.md`, `license-proposal.md`, `release-readiness.md`, `implementation-status.md`. |
 | `.github/workflows/` | `ci.yml` (deterministic tests, lint), `windows-release.yml` (x64 installer + SHA-256). |
-| `scripts/` | `capture-fixtures.sh` (refresh captured originals), `build-windows.ps1` (local Windows build, same steps as CI). |
+| `scripts/` | `capture-fixtures.sh` (refresh captured originals), `build-windows.ps1` (local Windows build, same steps as CI), `install-mcp-macos.sh` / `install-mcp-windows.ps1` (install `swo-mcp` per user, optional background report updater). |
 | `LICENSE`, `THIRD-PARTY.md`, `CONTRIBUTING.md` | Licence, third-party notices, contribution guide. |
 
 ## Configuration reference

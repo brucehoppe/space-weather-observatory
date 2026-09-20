@@ -71,7 +71,7 @@ full clean-machine test checklist.
 ## Sanity check: does it actually work?
 
 ```bash
-cargo test --workspace   # 199 deterministic tests, no network
+cargo test --workspace   # 220 deterministic tests, no network
 npm test                 # 12 frontend tests
 ```
 
@@ -84,6 +84,19 @@ they run against fixtures captured from real NOAA responses in `fixtures/capture
 - `docs/architecture.md` — how the pieces fit together.
 - `docs/sources.md` — every data product, its endpoint, and how it's verified.
 - `CONTRIBUTING.md` — if you want to change something.
+
+## 3. Optional: plain-language reports from a local language model
+
+Have a model running on your own machine (via [Ollama](https://ollama.com)) write a space
+weather report anyone can read, keep it up to date, and explain any dashboard reading.
+Nothing leaves your computer. Step-by-step guide, including what Ollama is and which model to
+pick: [`docs/local-llm-quickstart.md`](docs/local-llm-quickstart.md). The short version:
+
+```bash
+scripts/install-mcp-macos.sh          # Windows: scripts\install-mcp-windows.ps1
+swo-mcp report
+swo-mcp ask "What does Kp mean?"
+```
 
 ## If something goes wrong
 

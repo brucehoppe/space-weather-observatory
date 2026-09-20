@@ -25,4 +25,11 @@ content-security policy in `src-tauri/tauri.conf.json` restricts it to bundled a
 identity, usage statistics. There is no account and no sign-in. No language model is called
 at runtime; all plain-language text comes from a reviewed rule layer in the source code.
 
+**Optional `swo-mcp` helper (separate program, off unless you install it).** It opens the
+cache read-only and makes no requests to data providers. Its `report` and `ask` commands
+send the dashboard readings to an Ollama endpoint, which by default is this machine
+(`http://127.0.0.1:11434`), so nothing leaves it; setting `OLLAMA_HOST` to another computer,
+or connecting an MCP client that uses a hosted model, sends those readings there. Reports it
+writes are saved in `reports/` beside the cache. See `docs/local-llm-quickstart.md`.
+
 **Exports** are written only to a path you choose in the native save dialog.

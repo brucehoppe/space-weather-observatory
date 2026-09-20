@@ -1,0 +1,30 @@
+[package]
+name = "swo-mcp"
+description = "Optional MCP server over the Space Weather Observatory cache, with a built-in local-LLM (Ollama) report writer. Separate process; the desktop app never loads a language model."
+version.workspace = true
+edition.workspace = true
+# rmcp 3.x needs Rust 1.88; the rest of the workspace keeps its 1.82 floor.
+rust-version = "1.88"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "swo-mcp"
+path = "src/main.rs"
+
+[dependencies]
+swo-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+rmcp = { version = "3.4.0", features = ["server", "macros", "transport-io"] }
+schemars = { version = "1.0", features = ["chrono04"] }
+tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread", "io-std", "time", "signal"] }
+rusqlite = { version = "0.40.2", features = ["bundled", "chrono"] }
+dirs = "6.0.0"
+sha2 = "0.10.9"
+# Plain HTTP to the local Ollama endpoint only, so no TLS stack.
+reqwest = { version = "0.13.4", default-features = false, features = ["json"] }
+
+[dev-dependencies]
