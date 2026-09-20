@@ -23,6 +23,7 @@ swo-mcp report                      # write the report if the saved one is out o
 swo-mcp report --watch              # stay running; rewrite whenever the data changes (checks every 300 s)
 swo-mcp ask "What does Bz mean, and is today's value unusual?"
 swo-mcp dashboard                   # the readings the model is given, as JSON
+swo-mcp register                    # add the server to Claude Desktop / Claude Code
 ```
 
 Reports are saved beside the cache, in `SpaceWeatherObservatory/reports/`: `latest.md`,
@@ -74,15 +75,27 @@ All values are parsed by `swo-core`, so quality flags and provenance match the a
 
 Any MCP client can drive the same tools instead of the built-in Ollama commands.
 
-Claude Desktop (`claude_desktop_config.json`) or Claude Code (`.mcp.json`):
+Claude Desktop and Claude Code:
+
+```bash
+swo-mcp register            # every client found; or: register claude-desktop | claude-code
+swo-mcp unregister
+```
+
+`register` merges a `space-weather` entry into the client's config. Other servers and
+settings are kept, the previous file is backed up beside it, and invalid JSON is refused
+rather than repaired. By hand, the entry is:
 
 ```json
 {
   "mcpServers": {
-    "space-weather": { "command": "/absolute/path/to/target/release/swo-mcp" }
+    "space-weather": { "command": "/absolute/path/to/swo-mcp" }
   }
 }
 ```
+
+The server starts even if the cache does not exist yet; its tools then say to open the
+desktop app, and work as soon as the cache appears.
 
 For a local model, use an MCP client that drives Ollama with tool calling (for example
 `mcphost`) pointed at the same command, then run the `update_report` prompt.

@@ -274,12 +274,32 @@ pub fn compose(d: &Dashboard, body: &str, model: &str, now: DateTime<Utc>) -> St
         }
     }
     md.push_str("\n---\n");
-    if let Some(age) = d.oldest_retrieval_age_minutes {
-        md.push_str(&format!(
-            "Data: NOAA SWPC products cached by Space Weather Observatory; the oldest was retrieved {} before this report. ",
-            human_minutes(age)
-        ));
+    md.push_str("Data: NOAA SWPC products cached by Space Weather Observatory");
+    match (
+        d.realtime_retrieval_age_minutes,
+        d.oldest_retrieval_age_minutes,
+    ) {
+        (Some(live), Some(oldest)) => {
+            md.push_str(&format!(
+                "; real-time readings retrieved {} before this report",
+                human_minutes(live)
+            ));
+            // Slow products (the monthly solar cycle) are refreshed rarely; say so
+            // rather than letting their age read as the age of everything.
+            if oldest > live + 180 {
+                md.push_str(&format!(
+                    " (slower-changing products up to {} before)",
+                    human_minutes(oldest)
+                ));
+            }
+        }
+        (None, Some(oldest)) => md.push_str(&format!(
+            "; retrieved up to {} before this report",
+            human_minutes(oldest)
+        )),
+        _ => {}
     }
+    md.push_str(". ");
     md.push_str(&format!(
         "Wording by the local language model `{model}`; the table above is computed directly from the data. \
          This is not an official forecast. Official products: <https://www.spaceweather.gov>. \
@@ -296,10 +316,11 @@ pub fn compose(d: &Dashboard, body: &str, model: &str, now: DateTime<Utc>) -> St
 }
 
 pub fn human_minutes(m: i64) -> String {
+    let plural = |n: i64, unit: &str| format!("{n} {unit}{}", if n == 1 { "" } else { "s" });
     match m {
-        m if m < 90 => format!("{m} minutes"),
-        m if m < 48 * 60 => format!("{} hours", m / 60),
-        m => format!("{} days", m / (24 * 60)),
+        m if m < 90 => plural(m, "minute"),
+        m if m < 48 * 60 => plural(m / 60, "hour"),
+        m => plural(m / (24 * 60), "day"),
     }
 }
 

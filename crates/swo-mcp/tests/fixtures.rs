@@ -602,3 +602,120 @@ async fn chat_tools_are_read_only_and_all_dispatchable() {
         .await
         .is_err());
 }
+
+#[test]
+fn the_footer_reports_the_age_of_real_time_data_not_of_monthly_products() {
+    let now = t("2026-09-06T18:30:00Z");
+    let mut d = swo_mcp::dashboard::build(&full_cache(), now);
+    assert_eq!(d.realtime_retrieval_age_minutes, Some(26));
+    // As in a live cache: solar wind just refreshed, the monthly solar cycle two days ago.
+    d.realtime_retrieval_age_minutes = Some(2);
+    d.oldest_retrieval_age_minutes = Some(2988);
+    let md = reports::compose(&d, REPORT_BODY, "m", now).markdown;
+    assert!(
+        md.contains("real-time readings retrieved 2 minutes before this report"),
+        "{md}"
+    );
+    assert!(md.contains("(slower-changing products up to 2 days before)"));
+    assert!(!md.contains("the oldest was retrieved"));
+}
+
+// ---------------------------------------------------------------- client registration
+
+#[test]
+fn registering_merges_into_an_existing_config_and_is_idempotent() {
+    use swo_mcp::register::{remove, upsert, Change, SERVER_NAME};
+    let existing = r#"{ "mcpServers": { "other": { "command": "/bin/other", "args": ["x"] } }, "preferences": { "a": 1 } }"#;
+
+    let (text, change) = upsert(Some(existing), "/usr/local/bin/swo-mcp").unwrap();
+    assert_eq!(change, Change::Added);
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        v["mcpServers"][SERVER_NAME]["command"],
+        "/usr/local/bin/swo-mcp"
+    );
+    assert_eq!(
+        v["mcpServers"]["other"]["args"][0], "x",
+        "other servers are kept"
+    );
+    assert_eq!(v["preferences"]["a"], 1, "other settings are kept");
+
+    assert_eq!(
+        upsert(Some(&text), "/usr/local/bin/swo-mcp").unwrap().1,
+        Change::AlreadyCurrent
+    );
+    assert_eq!(
+        upsert(Some(&text), "/elsewhere/swo-mcp").unwrap().1,
+        Change::Updated
+    );
+
+    let (text, change) = remove(Some(&text)).unwrap();
+    assert_eq!(change, Change::Removed);
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert!(v["mcpServers"].get(SERVER_NAME).is_none() && v["mcpServers"].get("other").is_some());
+    assert_eq!(remove(Some(&text)).unwrap().1, Change::NotPresent);
+
+    // No file yet.
+    let (text, change) = upsert(None, "/x").unwrap();
+    assert_eq!(change, Change::Added);
+    assert!(text.contains(SERVER_NAME));
+}
+
+#[test]
+fn a_config_that_is_not_valid_json_is_refused_not_repaired() {
+    use swo_mcp::register::upsert;
+    assert!(upsert(Some("{ not json"), "/x").is_err());
+    assert!(upsert(Some("[1, 2]"), "/x").is_err());
+    assert!(upsert(Some(r#"{ "mcpServers": [] }"#), "/x").is_err());
+}
+
+#[test]
+fn editing_a_config_file_backs_it_up_first_and_skips_no_op_writes() {
+    use swo_mcp::register::{edit_file, upsert, Change};
+    let path = reports_dir("register").join("claude_desktop_config.json");
+    let original = r#"{"mcpServers":{"other":{"command":"/bin/other"}}}"#;
+    std::fs::write(&path, original).unwrap();
+
+    let (change, backup) = edit_file(&path, "STAMP", |c| upsert(c, "/x/swo-mcp")).unwrap();
+    assert_eq!(change, Change::Added);
+    assert_eq!(
+        std::fs::read_to_string(backup.unwrap()).unwrap(),
+        original,
+        "the backup is the untouched original"
+    );
+
+    let (change, backup) = edit_file(&path, "STAMP2", |c| upsert(c, "/x/swo-mcp")).unwrap();
+    assert_eq!(change, Change::AlreadyCurrent);
+    assert!(
+        backup.is_none(),
+        "nothing changed, so nothing was written or backed up"
+    );
+
+    std::fs::write(&path, "{ broken").unwrap();
+    assert!(edit_file(&path, "STAMP3", |c| upsert(c, "/x/swo-mcp")).is_err());
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "{ broken",
+        "a broken file is left exactly as it was"
+    );
+}
+
+#[tokio::test]
+async fn a_server_started_before_the_cache_exists_explains_itself_then_recovers() {
+    let db = reports_dir("lazy").join("observatory.sqlite3");
+    let server = SwoServer::lazy(&db);
+    let err = server.get_dashboard().await.err().unwrap();
+    assert!(err.contains("Open the desktop app"), "{err}");
+    // What a reading *is* needs no data; only the current value is missing.
+    let req = ExplainRequest {
+        reading: Some("kp".into()),
+    };
+    let explained = server.explain_reading(Parameters(req)).await.unwrap().0;
+    assert!(explained.entries[0].id == "kp_index" && explained.current.is_none());
+
+    // The desktop app runs for the first time; the same server picks the cache up.
+    full_cache()
+        .execute("VACUUM INTO ?1", [db.to_str().unwrap()])
+        .unwrap();
+    assert!(server.get_dashboard().await.unwrap().0.solar_wind.is_some());
+}

@@ -71,7 +71,7 @@ full clean-machine test checklist.
 ## Sanity check: does it actually work?
 
 ```bash
-cargo test --workspace   # 220 deterministic tests, no network
+cargo test --workspace   # 225 deterministic tests, no network
 npm test                 # 12 frontend tests
 ```
 

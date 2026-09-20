@@ -5,6 +5,9 @@
 #   scripts/install-mcp-macos.sh --autostart     also keep the report up to date in the
 #                                                background (a per-user LaunchAgent running
 #                                                `swo-mcp report --watch`)
+#   scripts/install-mcp-macos.sh --register      also add it to the MCP clients found on this Mac
+#                                                (Claude Desktop, Claude Code); configs are
+#                                                merged and backed up, never overwritten
 #   scripts/install-mcp-macos.sh --model NAME    Ollama model to use and pull (default qwen3:8b)
 #   scripts/install-mcp-macos.sh --no-pull       do not download the model
 #   scripts/install-mcp-macos.sh --uninstall     remove exactly what this script installed
@@ -21,16 +24,18 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME/Library/Logs/swo-mcp.log"
 MODEL="qwen3:8b"
 AUTOSTART=0
+REGISTER=0
 PULL=1
 UNINSTALL=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --autostart) AUTOSTART=1 ;;
+    --register) REGISTER=1 ;;
     --no-pull) PULL=0 ;;
     --uninstall) UNINSTALL=1 ;;
     --model) MODEL="${2:?--model needs a name}"; shift ;;
-    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2 ;;
   esac
   shift
@@ -45,6 +50,8 @@ stop_agent() {
 if [ "$UNINSTALL" = 1 ]; then
   echo "==> Uninstalling swo-mcp"
   stop_agent
+  # Take our entry out of MCP client configs while the binary that knows how still exists.
+  if [ -x "$BIN" ]; then "$BIN" unregister || echo "could not unregister from MCP clients; remove the 'space-weather' entry by hand"; fi
   # Remove only the two files this script creates, by name, and say what happened to each.
   for f in "$PLIST" "$BIN"; do
     if [ -e "$f" ]; then rm "$f" && echo "removed $f"; else echo "not present: $f"; fi
@@ -111,6 +118,11 @@ EOF
   echo "ok: running now and at every login. Log: $LOG"
 fi
 
+if [ "$REGISTER" = 1 ]; then
+  echo "==> Registering with MCP clients"
+  "$BIN" register
+fi
+
 REPORTS="$HOME/Library/Application Support/SpaceWeatherObservatory/reports"
 cat <<EOF
 
@@ -122,8 +134,9 @@ Try it (open the Space Weather Observatory app first so the data is fresh):
   swo-mcp ask "What does Kp mean?"   have the local model explain a reading
   swo-mcp report --watch             keep the report up to date until you press Ctrl-C
 
-To use it from an MCP client (Claude Desktop, Claude Code, mcphost...), add:
-  { "mcpServers": { "space-weather": { "command": "$BIN" } } }
+To use it from Claude Desktop or Claude Code (merges into their config, with a backup):
+  swo-mcp register                   undo with: swo-mcp unregister
+Any other MCP client (mcphost...): { "mcpServers": { "space-weather": { "command": "$BIN" } } }
 EOF
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;

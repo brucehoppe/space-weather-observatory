@@ -5,6 +5,9 @@
 #   install-mcp-windows.ps1 -Autostart      also keep the report up to date in the background
 #                                           (a per-user scheduled task running
 #                                           `swo-mcp report --watch` at logon)
+#   install-mcp-windows.ps1 -Register       also add it to the MCP clients found on this PC
+#                                           (Claude Desktop, Claude Code); configs are
+#                                           merged and backed up, never overwritten
 #   install-mcp-windows.ps1 -Model NAME     Ollama model to use and pull (default qwen3:8b)
 #   install-mcp-windows.ps1 -NoPull         do not download the model
 #   install-mcp-windows.ps1 -Exe PATH       install a prebuilt swo-mcp.exe (from a release
@@ -26,6 +29,7 @@
 
 param(
     [switch]$Autostart,
+    [switch]$Register,
     [switch]$NoPull,
     [switch]$Uninstall,
     [string]$Exe = "",
@@ -59,6 +63,11 @@ function Get-UserPathEntries {
 if ($Uninstall) {
     Write-Host "==> Uninstalling swo-mcp"
     Stop-Watcher
+    # Take our entry out of MCP client configs while the exe that knows how still exists.
+    if (Test-Path -LiteralPath $Installed) {
+        & $Installed unregister
+        if ($LASTEXITCODE -ne 0) { Write-Warning "Could not unregister from MCP clients; remove the 'space-weather' entry by hand." }
+    }
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
         Write-Host "removed scheduled task '$TaskName'"
@@ -151,6 +160,12 @@ if ($Autostart) {
     Write-Host "ok: running now and at every logon. Log: $Log"
 }
 
+if ($Register) {
+    Write-Host "==> Registering with MCP clients"
+    & $Installed register
+    if ($LASTEXITCODE -ne 0) { Write-Warning "Registration failed; run 'swo-mcp register' later to retry." }
+}
+
 $reports = Join-Path $env:APPDATA "SpaceWeatherObservatory\reports"
 $exeJson = $Installed.Replace("\", "\\")
 Write-Host @"
@@ -163,6 +178,7 @@ Try it (open the Space Weather Observatory app first so the data is fresh):
   swo-mcp ask "What does Kp mean?"   have the local model explain a reading
   swo-mcp report --watch             keep the report up to date until you press Ctrl-C
 
-To use it from an MCP client (Claude Desktop, Claude Code, mcphost...), add:
-  { "mcpServers": { "space-weather": { "command": "$exeJson" } } }
+To use it from Claude Desktop or Claude Code (merges into their config, with a backup):
+  swo-mcp register                   undo with: swo-mcp unregister
+Any other MCP client (mcphost...): { "mcpServers": { "space-weather": { "command": "$exeJson" } } }
 "@

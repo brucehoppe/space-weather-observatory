@@ -47,7 +47,7 @@ Prerequisites: Rust (stable), Node 24+, and the Tauri platform prerequisites for
 
 ```bash
 npm ci
-cargo test --workspace         # 220 deterministic tests, fixture-only, no network
+cargo test --workspace         # 225 deterministic tests, fixture-only, no network
 npm test                       # 12 frontend unit tests (Node)
 npm run tauri dev              # desktop app with hot reload
 npm run tauri build            # installer for the current platform

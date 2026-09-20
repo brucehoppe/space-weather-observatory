@@ -12,6 +12,7 @@
 use rmcp::{transport::stdio, ServiceExt};
 use std::path::PathBuf;
 use std::time::Duration;
+use swo_mcp::register::{self, Change};
 use swo_mcp::{ollama, SwoServer};
 
 const USAGE: &str = "\
@@ -22,6 +23,9 @@ commands:
   report                have the local model write the plain-language report, if out of date
   ask \"QUESTION\"        ask the local model about the dashboard or any reading
   dashboard             print the current dashboard readings as JSON
+  register [CLIENT]     add this server to an MCP client: claude-desktop, claude-code,
+                        or all (default: every client found on this machine)
+  unregister [CLIENT]   remove it again; other servers in the config are untouched
 
 options:
   --db PATH             cache to read (default: the desktop app's cache; env SWO_DB)
@@ -106,8 +110,107 @@ fn default_db() -> Option<PathBuf> {
     })
 }
 
+/// Run the `claude` CLI (Claude Code). On Windows it is a `.cmd` shim, which
+/// only `cmd` can launch.
+fn claude_cli(args: &[&str]) -> std::io::Result<std::process::Output> {
+    if cfg!(windows) {
+        std::process::Command::new("cmd")
+            .args(["/c", "claude"])
+            .args(args)
+            .output()
+    } else {
+        std::process::Command::new("claude").args(args).output()
+    }
+}
+
+/// `register` / `unregister`. Needs no cache, so it works before the app has ever run.
+fn register_clients(client: Option<&str>, add: bool) -> Result<(), String> {
+    let client = client.unwrap_or("all");
+    if !["all", "claude-desktop", "claude-code"].contains(&client) {
+        return Err(format!(
+            "unknown client {client:?}; use claude-desktop, claude-code or all"
+        ));
+    }
+    let exe = std::env::current_exe().map_err(|e| format!("cannot find my own path: {e}"))?;
+    let exe = exe.to_str().ok_or("my own path is not valid UTF-8")?;
+    let mut found = false;
+
+    if client != "claude-code" {
+        let config =
+            register::claude_desktop_config().ok_or("no per-user configuration directory")?;
+        // Only treat Claude Desktop as installed if its folder exists, unless asked for by name.
+        if client == "claude-desktop" || config.parent().is_some_and(|d| d.is_dir()) {
+            found = true;
+            let stamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
+            let (change, backup) = if add {
+                register::edit_file(&config, &stamp, |c| register::upsert(c, exe))?
+            } else {
+                register::edit_file(&config, &stamp, register::remove)?
+            };
+            let what = match change {
+                Change::Added => "added",
+                Change::Updated => "updated (the path had changed)",
+                Change::AlreadyCurrent => "already registered; nothing to change",
+                Change::Removed => "removed",
+                Change::NotPresent => "was not registered; nothing to change",
+            };
+            println!("Claude Desktop: {what}\n  config: {}", config.display());
+            if let Some(b) = backup {
+                println!("  backup of the previous config: {}", b.display());
+                println!("  Quit and reopen Claude Desktop for the change to take effect.");
+            }
+        }
+    }
+
+    if client != "claude-code" && client != "all" {
+        return Ok(());
+    }
+    match claude_cli(&["--version"]) {
+        Ok(out) if out.status.success() => {
+            found = true;
+            // `mcp add` fails if the name exists, so remove first; a miss is fine.
+            let removed = claude_cli(&["mcp", "remove", "--scope", "user", register::SERVER_NAME]);
+            if add {
+                let out = claude_cli(&[
+                    "mcp",
+                    "add",
+                    "--scope",
+                    "user",
+                    register::SERVER_NAME,
+                    "--",
+                    exe,
+                ])
+                .map_err(|e| format!("could not run `claude mcp add`: {e}"))?;
+                if !out.status.success() {
+                    return Err(format!(
+                        "`claude mcp add` failed: {}",
+                        String::from_utf8_lossy(&out.stderr).trim()
+                    ));
+                }
+                println!("Claude Code: registered for your user (check with `claude mcp list`)");
+            } else if removed.is_ok_and(|o| o.status.success()) {
+                println!("Claude Code: removed");
+            } else {
+                println!("Claude Code: was not registered; nothing to change");
+            }
+        }
+        _ if client == "claude-code" => {
+            return Err("the `claude` command was not found on your PATH".into())
+        }
+        _ => {}
+    }
+    if !found {
+        println!("No MCP client found (looked for Claude Desktop and the `claude` command).");
+        println!("For any other client, add: {{ \"mcpServers\": {{ \"{}\": {{ \"command\": \"{}\" }} }} }}", register::SERVER_NAME, exe.replace('\\', "\\\\"));
+    }
+    Ok(())
+}
+
 async fn run() -> Result<(), String> {
     let args = parse_args()?;
+    if matches!(args.command.as_str(), "register" | "unregister") {
+        return register_clients(args.question.as_deref(), args.command == "register");
+    }
     let db = args
         .db
         .or_else(default_db)
@@ -119,7 +222,14 @@ async fn run() -> Result<(), String> {
             .unwrap_or(std::path::Path::new("."))
             .join("reports")
     });
-    let server = SwoServer::open(&db)?.with_reports_dir(&reports);
+    // Serving must survive a missing cache (the client starts us at launch);
+    // the one-shot commands should fail straight away with the reason.
+    let server = if args.command == "serve" {
+        SwoServer::lazy(&db)
+    } else {
+        SwoServer::open(&db)?
+    };
+    let server = server.with_reports_dir(&reports);
 
     match args.command.as_str() {
         "serve" => {

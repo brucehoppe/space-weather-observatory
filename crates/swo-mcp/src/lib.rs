@@ -16,6 +16,7 @@ pub mod detail;
 pub mod glossary;
 pub mod ollama;
 pub mod prompts;
+pub mod register;
 pub mod reports;
 
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
@@ -329,9 +330,24 @@ fn newest_time(obs: &[Observation]) -> Option<DateTime<Utc>> {
 
 // ---------------------------------------------------------------- server
 
+/// A locked, open cache connection.
+struct CacheGuard<'a>(std::sync::MutexGuard<'a, Option<Connection>>);
+
+impl std::ops::Deref for CacheGuard<'_> {
+    type Target = Connection;
+    fn deref(&self) -> &Connection {
+        self.0
+            .as_ref()
+            .expect("CacheGuard is only built around an open connection")
+    }
+}
+
 #[derive(Clone)]
 pub struct SwoServer {
-    conn: Arc<Mutex<Connection>>,
+    /// `None` until the cache has been opened (see [`SwoServer::lazy`]).
+    conn: Arc<Mutex<Option<Connection>>>,
+    /// Cache to open on first use, when serving before the cache exists.
+    db: Option<PathBuf>,
     /// Fixed clock for deterministic tests; `None` reads the system clock.
     fixed_now: Option<DateTime<Utc>>,
     /// Where reports are saved; `None` disables the report tools.
@@ -341,17 +357,69 @@ pub struct SwoServer {
 }
 
 impl SwoServer {
-    /// Open the app's cache read-only and check its schema version.
-    pub fn open(db: &Path) -> Result<Self, String> {
-        let conn = Connection::open_with_flags(
+    fn connect(db: &Path) -> Result<Connection, String> {
+        if !db.exists() {
+            return Err(format!(
+                "The Space Weather Observatory cache was not found at {}. Open the desktop app once \
+                 so it can download data, then try again.",
+                db.display()
+            ));
+        }
+        Connection::open_with_flags(
             db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
-        .map_err(|e| format!("cannot open cache {}: {e}", db.display()))?;
-        Self::from_connection(conn)
+        .map_err(|e| format!("cannot open cache {}: {e}", db.display()))
+    }
+
+    /// Open the app's cache read-only and check its schema version.
+    pub fn open(db: &Path) -> Result<Self, String> {
+        Self::from_connection(Self::connect(db)?)
+    }
+
+    /// A server that opens the cache on first use. An MCP client starts the
+    /// server at launch, possibly before the desktop app has ever run; failing
+    /// then would show the user a bare "connection closed". This way the server
+    /// starts, and each tool explains what is missing until the cache appears.
+    pub fn lazy(db: &Path) -> Self {
+        match Self::open(db) {
+            Ok(server) => server,
+            Err(_) => Self {
+                conn: Arc::new(Mutex::new(None)),
+                db: Some(db.to_path_buf()),
+                fixed_now: None,
+                reports: None,
+                tool_router: Self::tool_router() + Self::report_tool_router(),
+                prompt_router: Self::prompt_router(),
+            },
+        }
+    }
+
+    /// The open cache, opening it now if it was not available at startup.
+    fn cache(&self) -> Result<CacheGuard<'_>, String> {
+        let mut guard = self.conn.lock().map_err(|_| "cache lock poisoned")?;
+        if guard.is_none() {
+            let db = self.db.as_deref().ok_or("no cache configured")?;
+            let conn = Self::connect(db)?;
+            Self::check_schema(&conn)?;
+            *guard = Some(conn);
+        }
+        Ok(CacheGuard(guard))
     }
 
     pub fn from_connection(conn: Connection) -> Result<Self, String> {
+        Self::check_schema(&conn)?;
+        Ok(Self {
+            conn: Arc::new(Mutex::new(Some(conn))),
+            db: None,
+            fixed_now: None,
+            reports: None,
+            tool_router: Self::tool_router() + Self::report_tool_router(),
+            prompt_router: Self::prompt_router(),
+        })
+    }
+
+    fn check_schema(conn: &Connection) -> Result<(), String> {
         let version: Option<String> = conn
             .query_row(
                 "SELECT value FROM meta WHERE key = 'schema_version'",
@@ -368,13 +436,7 @@ impl SwoServer {
                 ))
             }
         }
-        Ok(Self {
-            conn: Arc::new(Mutex::new(conn)),
-            fixed_now: None,
-            reports: None,
-            tool_router: Self::tool_router() + Self::report_tool_router(),
-            prompt_router: Self::prompt_router(),
-        })
+        Ok(())
     }
 
     pub fn with_fixed_now(mut self, now: DateTime<Utc>) -> Self {
@@ -393,7 +455,7 @@ impl SwoServer {
 
     /// Every dashboard reading from the newest cached snapshots.
     pub fn dashboard(&self) -> Result<dashboard::Dashboard, String> {
-        let conn = self.conn.lock().map_err(|_| "cache lock poisoned")?;
+        let conn = self.cache()?;
         Ok(dashboard::build(&conn, self.now()))
     }
 
@@ -434,7 +496,7 @@ impl SwoServer {
     )]
     pub async fn list_products(&self) -> Result<Json<ProductList>, String> {
         let now = self.now();
-        let conn = self.conn.lock().map_err(|_| "cache lock poisoned")?;
+        let conn = self.cache()?;
         let mut products = Vec::with_capacity(PRODUCTS.len());
         for &product in PRODUCTS {
             let latest = snapshot_at(&conn, product, None)?;
@@ -478,7 +540,7 @@ impl SwoServer {
         let at = req.at.as_deref().map(parse_time).transpose()?;
 
         let (wind_snap, mag_snap) = {
-            let conn = self.conn.lock().map_err(|_| "cache lock poisoned")?;
+            let conn = self.cache()?;
             (
                 snapshot_at(&conn, "rtsw_wind_1m", at)?,
                 snapshot_at(&conn, "rtsw_mag_1m", at)?,
@@ -565,7 +627,7 @@ impl SwoServer {
         Parameters(req): Parameters<detail::KpRequest>,
     ) -> Result<Json<detail::KpReport>, String> {
         let at = req.at.as_deref().map(parse_time).transpose()?;
-        let conn = self.conn.lock().map_err(|_| "cache lock poisoned")?;
+        let conn = self.cache()?;
         detail::kp_report(&conn, &req, at.unwrap_or_else(|| self.now()), at).map(Json)
     }
 
@@ -581,7 +643,7 @@ impl SwoServer {
         Parameters(req): Parameters<detail::FlaresRequest>,
     ) -> Result<Json<detail::FlaresReport>, String> {
         let at = req.at.as_deref().map(parse_time).transpose()?;
-        let conn = self.conn.lock().map_err(|_| "cache lock poisoned")?;
+        let conn = self.cache()?;
         detail::flares_report(&conn, &req, at.unwrap_or_else(|| self.now()), at).map(Json)
     }
 
@@ -595,7 +657,7 @@ impl SwoServer {
     )]
     pub async fn get_interpretation(&self) -> Result<Json<detail::Interpretation>, String> {
         let now = self.now();
-        let conn = self.conn.lock().map_err(|_| "cache lock poisoned")?;
+        let conn = self.cache()?;
         let (_, statements) = dashboard::build_with_statements(&conn, now);
         Ok(Json(detail::interpretation(statements, now)))
     }
@@ -632,13 +694,19 @@ impl SwoServer {
             )
         })?;
         // `dashboard_field` is `panel` or `panel.measure`; walk it through the JSON.
-        let board = serde_json::to_value(self.dashboard()?).map_err(|e| e.to_string())?;
-        let current = entry
-            .dashboard_field
-            .split('.')
-            .try_fold(&board, |v, key| v.get(key))
-            .filter(|v| !v.is_null())
-            .cloned();
+        // The explanation itself needs no data, so a missing cache only costs the current value.
+        let current = self
+            .dashboard()
+            .ok()
+            .and_then(|d| serde_json::to_value(d).ok())
+            .and_then(|board| {
+                entry
+                    .dashboard_field
+                    .split('.')
+                    .try_fold(&board, |v, key| v.get(key))
+                    .filter(|v| !v.is_null())
+                    .cloned()
+            });
         Ok(Json(Explanation {
             glossary_version: glossary::GLOSSARY_VERSION.into(),
             entries: vec![entry],

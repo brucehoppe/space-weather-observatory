@@ -13,7 +13,9 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 const DEFAULT_HOST: &str = "http://127.0.0.1:11434";
-/// Model families tried first when no model is named; all handle tool calling.
+/// Used when installed and no model is named: the one the docs and installers set up.
+const DEFAULT_MODEL: &str = "qwen3:8b";
+/// Families tried next, in order; all handle tool calling.
 const PREFERRED: &[&str] = &[
     "qwen3", "qwen2.5", "llama3.1", "llama3.2", "mistral", "gemma",
 ];
@@ -78,9 +80,14 @@ impl Ollama {
             .as_array()
             .map(|a| a.iter().filter_map(|m| m["name"].as_str()).collect())
             .unwrap_or_default();
-        let pick = PREFERRED
+        let pick = names
             .iter()
-            .find_map(|family| names.iter().find(|n| n.starts_with(family)))
+            .find(|n| **n == DEFAULT_MODEL)
+            .or_else(|| {
+                PREFERRED
+                    .iter()
+                    .find_map(|family| names.iter().find(|n| n.starts_with(family)))
+            })
             .or(names.first())
             .ok_or("Ollama has no models installed. Try `ollama pull qwen3:8b`.")?
             .to_string();

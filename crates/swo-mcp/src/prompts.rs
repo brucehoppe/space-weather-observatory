@@ -28,7 +28,8 @@ Rules:
 days that have already passed as past.
 - For current values use each reading's `latest`, not the mean.
 - X-ray classes A and B are the Sun's quiet background, not flares. Only C, M and X are flares.
-- Say 'no effects are expected' rather than promising that everything is working.
+- Say 'no effects are expected' rather than promising anything. Never write that devices 'will work', \
+that anything is 'safe', or that there is 'nothing to worry about'; you cannot know the reader's situation.
 - Use the `statements` in the data for what a G, R or S level means. Do not add effects they do not state.
 - No title, no table, no sign-off. 150 to 250 words.";
 

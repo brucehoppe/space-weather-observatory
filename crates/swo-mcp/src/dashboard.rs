@@ -217,6 +217,9 @@ pub struct Dashboard {
     pub data_fingerprint: String,
     /// Age in minutes of the oldest product retrieval feeding this dashboard.
     pub oldest_retrieval_age_minutes: Option<i64>,
+    /// Age in minutes of the real-time (1-minute solar wind) retrieval: how old
+    /// "now" is. Monthly products such as the solar cycle are legitimately older.
+    pub realtime_retrieval_age_minutes: Option<i64>,
     /// Present when the data is more than 3 hours old. Any report or answer
     /// must pass this warning on to the reader.
     pub stale_data_warning: Option<String>,
@@ -760,6 +763,7 @@ pub fn build_with_statements(conn: &Connection, now: DateTime<Utc>) -> (Dashboar
         now: rfc3339(now),
         data_fingerprint: format!("{:x}", b.hasher.finalize())[..16].to_string(),
         oldest_retrieval_age_minutes: b.oldest,
+        realtime_retrieval_age_minutes: age,
         stale_data_warning,
         solar_wind,
         xray_flux,

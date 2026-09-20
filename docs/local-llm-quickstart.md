@@ -97,6 +97,7 @@ Ollama, and downloads the model if it is missing. Useful options:
 | macOS | Windows | What it does |
 |---|---|---|
 | `--autostart` | `-Autostart` | Keep the report up to date in the background, starting at every login. |
+| `--register` | `-Register` | Also add it to Claude Desktop and Claude Code, if installed (same as `swo-mcp register`). |
 | `--model NAME` | `-Model NAME` | Use a different model. |
 | `--no-pull` | `-NoPull` | Do not download the model. |
 | `--uninstall` | `-Uninstall` | Remove what the script installed. Your reports are kept. |
@@ -165,9 +166,22 @@ than explaining from memory.
 
 ## Optional: use it from another AI app
 
-`swo-mcp` with no arguments is a standard MCP server, so MCP-capable apps (Claude Desktop,
-Claude Code, `mcphost` with Ollama, and others) can use the same tools. Add this to the app's
-MCP configuration, with the path the installer printed:
+`swo-mcp` with no arguments is a standard MCP server, so MCP-capable apps can use the same
+tools. For Claude Desktop and Claude Code there is a command that sets it up:
+
+```bash
+swo-mcp register            # every client found; or: register claude-desktop | claude-code
+swo-mcp unregister          # take it out again
+```
+
+It **merges** one entry into the client's existing configuration: other servers and settings
+are kept, the previous file is copied to `claude_desktop_config.json.backup-<time>` first, and
+a config that is not valid JSON is left untouched rather than "repaired". Quit and reopen
+Claude Desktop afterwards. Then ask it, for example, *"Use the space-weather tools to update
+the report"* or pick the `update_report` prompt.
+
+For any other client (for example `mcphost` with Ollama), add this to its MCP configuration,
+with the path the installer printed:
 
 ```json
 { "mcpServers": { "space-weather": { "command": "/Users/you/.local/bin/swo-mcp" } } }
@@ -183,7 +197,7 @@ Note that an app using a hosted model sends the readings to that provider. The `
 |---|---|
 | `cannot reach Ollama at http://127.0.0.1:11434` | Ollama is not running. Open the Ollama app, or run `ollama serve`. |
 | `Ollama has no models installed` | `ollama pull qwen3:8b` |
-| `cannot open cache ...` | Open the desktop app once so the cache exists. |
+| `cache was not found` | Open the desktop app once so the cache exists. An MCP client that started the server earlier picks it up on the next request; no restart needed. |
 | The report starts with **Old data** | Open the desktop app and let it refresh, then run `swo-mcp report` again. |
 | It is slow | The first request loads the model into memory. If every request is slow, try a smaller model with `--model`. |
 | `swo-mcp: command not found` | macOS: add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc`. Windows: open a new terminal. |
