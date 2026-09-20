@@ -138,13 +138,17 @@ mod tests {
 
     const OBSERVED: &str =
         include_str!("../../../../fixtures/captured/observed_solar_cycle_indices.json");
-    const PREDICTED: &str = include_str!("../../../../fixtures/captured/predicted_solar_cycle.json");
+    const PREDICTED: &str =
+        include_str!("../../../../fixtures/captured/predicted_solar_cycle.json");
 
     #[test]
     fn observed_fixture_parses_a_long_monthly_history() {
         let months = parse_observed(OBSERVED).unwrap();
         assert!(months.len() > 1000, "the provider publishes since 1749");
-        assert_eq!(months[0].month, NaiveDate::from_ymd_opt(1749, 1, 1).unwrap());
+        assert_eq!(
+            months[0].month,
+            NaiveDate::from_ymd_opt(1749, 1, 1).unwrap()
+        );
         for pair in months.windows(2) {
             assert!(pair[1].month > pair[0].month, "months must be increasing");
         }

@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use swo_core::interpret::{self, Basis, Statement};
 use swo_core::model::*;
-use swo_core::parse::{self, bulletins, forecast_text, goes, kp, ovation, rtsw, scales, solar_cycle};
+use swo_core::parse::{
+    self, bulletins, forecast_text, goes, kp, ovation, rtsw, scales, solar_cycle,
+};
 
 use crate::providers::Product;
 use crate::store::Snapshot as StoredSnapshot;
@@ -480,12 +482,9 @@ pub fn assemble(
     statuses.push(status(
         Product::SolarCycleObserved,
         payloads.get(Product::SolarCycleObserved.key()),
-        solar_cycle_observed.last().map(|m| {
-            m.month
-                .and_hms_opt(0, 0, 0)
-                .unwrap()
-                .and_utc()
-        }),
+        solar_cycle_observed
+            .last()
+            .map(|m| m.month.and_hms_opt(0, 0, 0).unwrap().and_utc()),
         now,
         observed_err,
     ));
@@ -501,12 +500,9 @@ pub fn assemble(
     statuses.push(status(
         Product::SolarCyclePredicted,
         payloads.get(Product::SolarCyclePredicted.key()),
-        solar_cycle_predicted.last().map(|m| {
-            m.month
-                .and_hms_opt(0, 0, 0)
-                .unwrap()
-                .and_utc()
-        }),
+        solar_cycle_predicted
+            .last()
+            .map(|m| m.month.and_hms_opt(0, 0, 0).unwrap().and_utc()),
         now,
         predicted_err,
     ));

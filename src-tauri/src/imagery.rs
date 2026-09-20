@@ -267,7 +267,10 @@ mod tests {
     #[test]
     fn sequence_frame_count_and_step_are_clamped_not_silently_ignored() {
         let end = Utc::now();
-        assert_eq!(sequence_instants(end, 0, 30).len(), MIN_SEQUENCE_FRAMES as usize);
+        assert_eq!(
+            sequence_instants(end, 0, 30).len(),
+            MIN_SEQUENCE_FRAMES as usize
+        );
         assert_eq!(
             sequence_instants(end, 999, 30).len(),
             MAX_SEQUENCE_FRAMES as usize
