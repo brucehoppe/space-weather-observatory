@@ -1,6 +1,6 @@
 /** The Observatory view: readings strip, "What this means for you", the
  *  synchronized chart stack and the detail/status side panel. */
-import { ChartStack, type Panel } from "./chart";
+import { ChartStack, type Panel, xrayTickLabel } from "./chart";
 import { append, button, el } from "./dom";
 import {
   bzOrientation, fmtAge, fmtDuration, fmtFlux, fmtInZone, fmtUtc, fmtWithUnit, fluxClass, NO_VALUE,
@@ -242,6 +242,13 @@ export function renderMeaning(state: AppState, onToggle: () => void): HTMLElemen
 
 // --- Chart panels ---------------------------------------------------------------
 
+/** Kp bar colour: below 4 is quiet or unsettled, 4 is active, 5 and up is a storm (NOAA G1+). */
+function kpColour(kp: number): string {
+  if (kp >= 5) return "#e8756b";
+  if (kp >= 4) return "#e8a33d";
+  return "#63c98b";
+}
+
 export function buildPanels(d: Dashboard): Panel[] {
   const panels: Panel[] = [];
   const s = (key: string) => d.series[key];
@@ -254,6 +261,8 @@ export function buildPanels(d: Dashboard): Panel[] {
       scale: "linear",
       note: d.wind_spacecraft ? `spacecraft ${d.wind_spacecraft}` : "no active stream",
       series: [{ series: s(SERIES.speed)!, colour: "#7cc0ff" }],
+      // Drawn only when the wind actually reaches it (the app's own "elevated" level).
+      references: [{ value: 500, label: "500 km/s: fast (elevated) wind" }],
       minHeight: 90,
     });
   }
@@ -278,7 +287,7 @@ export function buildPanels(d: Dashboard): Panel[] {
       unit: "nT",
       scale: "linear",
       zeroReference: true,
-      note: "Bz in GSM (solid) and GSE (dashed); zero reference shown",
+      note: "Bz above 0 = north (field shields Earth), below 0 = south (couples to Earth) · GSM solid, GSE dashed",
       series: entries,
       minHeight: 90,
     });
@@ -294,6 +303,7 @@ export function buildPanels(d: Dashboard): Panel[] {
       scale: "log",
       note: `${d.xray_satellite ?? "unknown satellite"} · ${excluded} non-positive or invalid samples excluded from the log axis`,
       series: entries,
+      tickLabel: xrayTickLabel,
       minHeight: 90,
     });
   }
@@ -303,8 +313,9 @@ export function buildPanels(d: Dashboard): Panel[] {
       title: "Planetary Kp",
       unit: "Kp (3-hour intervals)",
       scale: "kp",
-      note: "solid = NOAA estimate/observation · hatched = NOAA forecast",
-      series: [{ series: s(SERIES.kp)!, colour: "#7f9bd0" }],
+      note: "solid = NOAA estimate/observation · hatched = NOAA forecast · green quiet, amber active, red storm",
+      series: [{ series: s(SERIES.kp)!, colour: "#7f9bd0", colourFor: kpColour }],
+      references: [{ value: 5, label: "Kp 5: geomagnetic storm (G1) begins" }],
       forecast: d.kp
         .filter((i) => i.kind === "predicted" && i.observation.value !== null)
         .map((i) => ({ time: i.observation.time, value: i.observation.value as number, scale: i.noaa_scale })),

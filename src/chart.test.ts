@@ -63,3 +63,25 @@ test("seven-day minute-cadence series: selection lookup p95 under 100 ms", () =>
   console.log(`TS segments: ${segs.length} segments in ${segMs.toFixed(3)} ms`);
   assert.ok(segMs < 100);
 });
+
+test("an interval bar longer than the visible range is clipped to the plot area", async () => {
+  const { clipBar } = await import("./chart.ts");
+  // A 3-hour Kp bar seen while zoomed to one hour: it spans the whole plot and no further.
+  const bar = clipBar(-2000, 9000, 1000);
+  assert.ok(bar);
+  assert.equal(bar.x, 76);
+  assert.equal(bar.x + bar.w, 1000 - 18);
+  // A bar that is wholly outside the plot draws nothing.
+  assert.equal(clipBar(-500, 20, 1000), null);
+  assert.equal(clipBar(990, 1100, 1000), null);
+  // An ordinary bar keeps its one-pixel gaps.
+  assert.deepEqual(clipBar(200, 300, 1000), { x: 201, w: 98 });
+});
+
+test("X-ray axis ticks are labelled with the flare class they mark", async () => {
+  const { xrayTickLabel } = await import("./chart.ts");
+  assert.equal(xrayTickLabel(1e-8), "A  1e-8");
+  assert.equal(xrayTickLabel(1e-6), "C  1e-6");
+  assert.equal(xrayTickLabel(1e-4), "X  1e-4");
+  assert.equal(xrayTickLabel(1e-9), "1e-9", "below class A there is no letter");
+});

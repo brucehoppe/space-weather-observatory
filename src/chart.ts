@@ -20,6 +20,15 @@ export interface PanelSeries {
   /** Drawn as a dashed line, used for secondary traces such as Bz in GSE. */
   dashed?: boolean;
   label?: string;
+  /** Colour for an interval bar by its value (Kp: green / amber / red). */
+  colourFor?: (value: number) => string;
+}
+
+/** A labelled horizontal line at a meaningful value, e.g. the Kp level where a
+ *  geomagnetic storm begins. Only drawn when it falls inside the panel's range. */
+export interface ReferenceLine {
+  value: number;
+  label: string;
 }
 
 export interface Panel {
@@ -35,6 +44,10 @@ export interface Panel {
   /** Forecast intervals for a Kp panel, kept visually separate. */
   forecast?: { time: string; value: number; scale: string | null }[];
   minHeight?: number;
+  /** Labelled lines at meaningful values, so the traces say what the levels mean. */
+  references?: ReferenceLine[];
+  /** Axis tick text, when the raw number means little (X-ray flux -> flare class). */
+  tickLabel?: (value: number) => string;
 }
 
 export interface ChartSelection {
@@ -56,6 +69,26 @@ interface Point {
 
 const PADDING = { left: 76, right: 18, top: 26, bottom: 8 };
 const AXIS_HEIGHT = 26;
+
+/** An interval bar (Kp lasts 3 hours) clipped to the plot area. A bar that
+ *  starts before or ends after the visible range would otherwise be drawn past
+ *  the chart edges and off the page. `null` when nothing of it is visible. */
+export function clipBar(x0: number, x1: number, width: number): { x: number; w: number } | null {
+  const left = Math.max(x0, PADDING.left);
+  const right = Math.min(x1, width - PADDING.right);
+  if (right <= left) return null;
+  // Keep the small gap between neighbouring bars, but only at a real bar edge.
+  const gapL = x0 >= PADDING.left ? 1 : 0;
+  const gapR = x1 <= width - PADDING.right ? 1 : 0;
+  return { x: left + gapL, w: Math.max(1, right - left - gapL - gapR) };
+}
+
+/** X-ray flux flare classes: each letter is ten times the one before. */
+export function xrayTickLabel(value: number): string {
+  const exp = Math.round(Math.log10(value));
+  const letter = ({ [-8]: "A", [-7]: "B", [-6]: "C", [-5]: "M", [-4]: "X" } as Record<number, string>)[exp];
+  return letter ? `${letter}  1e${exp}` : `1e${exp}`;
+}
 
 export class ChartStack {
   readonly canvas: HTMLCanvasElement;
@@ -286,21 +319,41 @@ export class ChartStack {
       ctx.restore();
     }
 
+    for (const ref of panel.references ?? []) {
+      if (ref.value < domain.min || ref.value > domain.max) continue;
+      const ry = Math.round(yOf(ref.value)) + 0.5;
+      ctx.save();
+      ctx.strokeStyle = "#e8a33d";
+      ctx.fillStyle = "#e8a33d";
+      ctx.globalAlpha = 0.75;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(PADDING.left, ry);
+      ctx.lineTo(width - PADDING.right, ry);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = "10px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(ref.label, width - PADDING.right - 4, ry - 2);
+      ctx.restore();
+    }
+
     // Forecast intervals (Kp), drawn behind observed values and hatched.
     if (panel.forecast?.length) {
       for (const cell of panel.forecast) {
         const t0 = new Date(cell.time).getTime();
         const t1 = t0 + 3 * 3600 * 1000;
         if (t1 < this.range.start || t0 > this.range.end) continue;
-        const x0 = this.x(t0, width);
-        const x1 = this.x(t1, width);
+        const bar = clipBar(this.x(t0, width), this.x(t1, width), width);
+        if (!bar) continue;
         const yTop = yOf(cell.value);
         ctx.save();
         ctx.fillStyle = "rgba(140, 170, 220, 0.22)";
         ctx.strokeStyle = "rgba(160, 190, 235, 0.75)";
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
-        ctx.rect(x0 + 1, yTop, Math.max(1, x1 - x0 - 2), plotBottom - yTop);
+        ctx.rect(bar.x, yTop, bar.w, plotBottom - yTop);
         ctx.fill();
         ctx.stroke();
         ctx.restore();
@@ -367,11 +420,12 @@ export class ChartStack {
       const t0 = new Date(obs.time).getTime();
       const t1 = t0 + (obs.interval_seconds ?? entry.series.nominal_cadence_seconds) * 1000;
       if (t1 < this.range.start || t0 > this.range.end) continue;
-      const x0 = this.x(t0, width);
-      const x1 = this.x(t1, width);
+      const bar = clipBar(this.x(t0, width), this.x(t1, width), width);
+      if (!bar) continue;
       const yTop = yOf(obs.value);
+      if (entry.colourFor) ctx.fillStyle = entry.colourFor(obs.value);
       ctx.globalAlpha = obs.quality === "suspect" ? 0.5 : 0.85;
-      ctx.fillRect(x0 + 1, yTop, Math.max(1, x1 - x0 - 2), plotBottom - yTop);
+      ctx.fillRect(bar.x, yTop, bar.w, plotBottom - yTop);
     }
     ctx.restore();
   }
@@ -425,7 +479,8 @@ export class ChartStack {
       const hi = Math.round(Math.log10(domain.max));
       const every = Math.max(1, Math.ceil((hi - lo + 1) / maxTicks));
       for (let e = lo; e <= hi; e += every) {
-        out.push({ value: Math.pow(10, e), label: `1e${e}` });
+        const value = Math.pow(10, e);
+        out.push({ value, label: panel.tickLabel ? panel.tickLabel(value) : `1e${e}` });
       }
       return out;
     }
@@ -766,16 +821,23 @@ function renderPanelSvg(
     parts.push(`<line x1="${PADDING.left}" y1="${zy}" x2="${width - PADDING.right}" y2="${zy}" stroke="${colours.fg}" stroke-opacity="0.5" stroke-dasharray="4,3"/>`);
   }
 
+  for (const ref of panel.references ?? []) {
+    if (ref.value < domain.min || ref.value > domain.max) continue;
+    const ry = Math.round(yOf(ref.value)) + 0.5;
+    parts.push(`<line x1="${PADDING.left}" y1="${ry}" x2="${width - PADDING.right}" y2="${ry}" stroke="#e8a33d" stroke-opacity="0.75" stroke-dasharray="5,3"/>`);
+    parts.push(`<text x="${width - PADDING.right - 4}" y="${ry - 3}" font-size="10" text-anchor="end" fill="#e8a33d">${escapeXml(ref.label)}</text>`);
+  }
+
   if (panel.forecast?.length) {
     for (const cell of panel.forecast) {
       const t0 = new Date(cell.time).getTime();
       const t1 = t0 + 3 * 3600 * 1000;
       if (t1 < range.start || t0 > range.end) continue;
-      const x0 = xOf(t0, range, width);
-      const x1 = xOf(t1, range, width);
+      const bar = clipBar(xOf(t0, range, width), xOf(t1, range, width), width);
+      if (!bar) continue;
       const yTop = yOf(cell.value);
       parts.push(
-        `<rect x="${x0 + 1}" y="${yTop}" width="${Math.max(1, x1 - x0 - 2)}" height="${plotBottom - yTop}" ` +
+        `<rect x="${bar.x}" y="${yTop}" width="${bar.w}" height="${plotBottom - yTop}" ` +
         `fill="rgba(140, 170, 220, 0.22)" stroke="rgba(160, 190, 235, 0.75)" stroke-dasharray="3,3"/>`,
       );
     }
@@ -834,13 +896,14 @@ function renderIntervalsSvg(
     const t0 = new Date(obs.time).getTime();
     const t1 = t0 + (obs.interval_seconds ?? entry.series.nominal_cadence_seconds) * 1000;
     if (t1 < range.start || t0 > range.end) continue;
-    const x0 = xOf(t0, range, width);
-    const x1 = xOf(t1, range, width);
+    const bar = clipBar(xOf(t0, range, width), xOf(t1, range, width), width);
+    if (!bar) continue;
     const yTop = yOf(obs.value);
     const opacity = obs.quality === "suspect" ? 0.5 : 0.85;
+    const fill = entry.colourFor ? entry.colourFor(obs.value) : entry.colour;
     parts.push(
-      `<rect x="${x0 + 1}" y="${yTop}" width="${Math.max(1, x1 - x0 - 2)}" height="${plotBottom - yTop}" ` +
-      `fill="${entry.colour}" fill-opacity="${opacity}"/>`,
+      `<rect x="${bar.x}" y="${yTop}" width="${bar.w}" height="${plotBottom - yTop}" ` +
+      `fill="${fill}" fill-opacity="${opacity}"/>`,
     );
   }
   return parts.join("");
