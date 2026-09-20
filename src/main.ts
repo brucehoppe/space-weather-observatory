@@ -10,6 +10,7 @@ import { fmtUtc } from "./format";
 import * as ipc from "./ipc";
 import { renderLearnView } from "./learn";
 import { buildPanels, renderMeaning, renderReadings, renderSidePanel, renderTimeline } from "./observatory";
+import { initUiScale, uiScale } from "./scale";
 import { renderSourcesView } from "./sources";
 import { datasetNow, Store, type SunPassband, type ViewName } from "./state";
 import type { Lesson, SunImage } from "./types";
@@ -139,7 +140,7 @@ function renderWorkspace(): HTMLElement {
   const state = store.get();
   const workspace = el("div", {
     class: `workspace${state.sideCollapsed ? " side-collapsed" : ""}`,
-    style: `--side-width:${state.sideWidth}px`,
+    style: `--side-width:${state.sideWidth}`,
   });
 
   const centre = el("div", { class: "centre-stack" });
@@ -265,10 +266,11 @@ function attachSplitter(splitter: HTMLElement): void {
   });
   splitter.addEventListener("pointermove", (e) => {
     if (!dragging) return;
-    const width = Math.min(720, Math.max(240, window.innerWidth - e.clientX));
+    // Design units (see scale.ts), so the width survives a change of UI scale.
+    const width = Math.round(Math.min(720, Math.max(240, (window.innerWidth - e.clientX) / uiScale())));
     store.set({ sideWidth: width });
     const workspace = root!.querySelector(".workspace") as HTMLElement | null;
-    workspace?.style.setProperty("--side-width", `${width}px`);
+    workspace?.style.setProperty("--side-width", String(width));
     chart?.render();
   });
   splitter.addEventListener("pointerup", () => { dragging = false; });
@@ -638,6 +640,12 @@ function patchSunFrameDom(passband: SunPassband, frame: SunImage, index: number,
 // --- Boot -----------------------------------------------------------------------
 
 async function boot(): Promise<void> {
+  // Grow the whole interface on large displays (see scale.ts). Canvases are drawn
+  // at the scale in force, so a change of scale redraws the view; before the
+  // first render there is nothing to redraw.
+  initUiScale(() => {
+    if (!document.querySelector(".boot")) render();
+  });
   // `?view=aurora` etc. lets browser-preview screenshots open a view directly.
   const requested = new URLSearchParams(window.location.search).get("view");
   if (requested === "aurora" || requested === "learn" || requested === "sources") {

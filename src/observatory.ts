@@ -9,6 +9,7 @@ import type { AppState } from "./state";
 import { datasetNow, INTERVAL_PRESETS } from "./state";
 import type { Dashboard, DomainStatus, Observation, ProductStatus, Series, Statement } from "./types";
 import { SERIES } from "./types";
+import { uiScale } from "./scale";
 
 // --- Readings strip -----------------------------------------------------------
 
@@ -44,13 +45,14 @@ function speedGauge(value: number | null, stale: boolean): HTMLCanvasElement {
   const canvas = el("canvas", { class: "gauge", "aria-hidden": "true" }) as HTMLCanvasElement;
   queueMicrotask(() => {
     const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth || 160;
+    const scale = uiScale();
+    const w = (canvas.clientWidth || 160) / scale; // design units; see scale.ts
     const h = 42;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
+    canvas.width = Math.round(w * scale * dpr);
+    canvas.height = Math.round(h * scale * dpr);
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.clearRect(0, 0, w, h);
     const cx = w / 2;
     const cy = h - 4;
@@ -79,13 +81,14 @@ function sparkline(series: Series | undefined, colour: string, windowMs = 3 * 36
   const canvas = el("canvas", { class: "sparkline", "aria-hidden": "true" }) as HTMLCanvasElement;
   queueMicrotask(() => {
     const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth || 160;
+    const scale = uiScale();
+    const w = (canvas.clientWidth || 160) / scale; // design units; see scale.ts
     const h = 22;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
+    canvas.width = Math.round(w * scale * dpr);
+    canvas.height = Math.round(h * scale * dpr);
     const ctx = canvas.getContext("2d");
     if (!ctx || !series) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.clearRect(0, 0, w, h);
     const end = series.samples.length ? new Date(series.samples[series.samples.length - 1]!.time).getTime() : Date.now();
     const start = end - windowMs;

@@ -10,6 +10,7 @@
  *    announce anything to assistive technology.
  */
 import type { Observation, Series } from "./types";
+import { uiScale } from "./scale.ts";
 
 export type Scale = "linear" | "log" | "kp";
 
@@ -174,7 +175,11 @@ export class ChartStack {
     return PADDING.left + ((t - this.range.start) / span) * (width - PADDING.left - PADDING.right);
   }
 
-  private timeAt(px: number, width: number): number {
+  /** `px` and `width` are CSS pixels on the canvas; the chart lays out in design units. */
+  private timeAt(cssPx: number, cssWidth: number): number {
+    const scale = uiScale();
+    const px = cssPx / scale;
+    const width = cssWidth / scale;
     const span = this.range.end - this.range.start || 1;
     const usable = width - PADDING.left - PADDING.right;
     return this.range.start + ((px - PADDING.left) / usable) * span;
@@ -182,15 +187,21 @@ export class ChartStack {
 
   render(): void {
     const dpr = window.devicePixelRatio || 1;
+    // Everything below draws in unscaled design units (fonts, padding, line
+    // widths). The transform maps them onto the real canvas, so on a large
+    // display the whole chart grows with the rest of the interface.
+    const scale = uiScale();
     const rect = this.canvas.getBoundingClientRect();
-    const width = Math.max(320, Math.floor(rect.width));
-    const height = Math.max(200, Math.floor(rect.height));
-    if (this.canvas.width !== width * dpr || this.canvas.height !== height * dpr) {
-      this.canvas.width = width * dpr;
-      this.canvas.height = height * dpr;
+    const width = Math.max(320, Math.floor(rect.width / scale));
+    const height = Math.max(200, Math.floor(rect.height / scale));
+    const bitmapW = Math.round(rect.width * dpr);
+    const bitmapH = Math.round(rect.height * dpr);
+    if (this.canvas.width !== bitmapW || this.canvas.height !== bitmapH) {
+      this.canvas.width = bitmapW;
+      this.canvas.height = bitmapH;
     }
     const ctx = this.ctx;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
     const style = getComputedStyle(this.canvas);
@@ -666,8 +677,9 @@ export function renderChartExportSvg(
   meta: { title: string; sources: string[]; status: string; units: string[] },
 ): string {
   const rect = stack.canvas.getBoundingClientRect();
-  const width = Math.max(320, Math.floor(rect.width));
-  const height = Math.max(200, Math.floor(rect.height));
+  // In design units, so the export looks like the screen whatever the UI scale.
+  const width = Math.max(320, Math.floor(rect.width / uiScale()));
+  const height = Math.max(200, Math.floor(rect.height / uiScale()));
   const range = stack.getRange();
   const panels = stack.getPanels();
 

@@ -17,6 +17,7 @@ import { fmtAge, fmtDuration, fmtUtc } from "./format";
 import * as ipc from "./ipc";
 import type { AppState } from "./state";
 import type { AuroraGrid } from "./types";
+import { uiScale } from "./scale";
 
 /** Natural Earth land polygons, public domain, bundled with the application. */
 export const MAP_CREDIT = "Coastlines: Natural Earth (public domain), via the world-atlas package";
@@ -93,13 +94,14 @@ export function auroraColour(percent: number): string {
 
 function drawHemisphere(canvas: HTMLCanvasElement, grid: AuroraGrid, hemisphere: Hemisphere): void {
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth || 320;
-  const h = canvas.clientHeight || 320;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
+  const scale = uiScale();
+  const w = (canvas.clientWidth || 320) / scale; // design units; see scale.ts
+  const h = (canvas.clientHeight || 320) / scale;
+  canvas.width = Math.round(w * scale * dpr);
+  canvas.height = Math.round(h * scale * dpr);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
   const cx = w / 2;
