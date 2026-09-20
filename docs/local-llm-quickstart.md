@@ -88,6 +88,9 @@ scripts/install-mcp-macos.sh
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-mcp-windows.ps1
 ```
 
+No Rust on Windows? Download `swo-mcp.exe` from the Windows release artifacts and run the
+script with `-Exe C:\path\to\swo-mcp.exe`; it installs that file instead of building.
+
 The script builds `swo-mcp`, installs it for your user only (no administrator rights), checks
 Ollama, and downloads the model if it is missing. Useful options:
 

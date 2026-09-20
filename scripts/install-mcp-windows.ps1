@@ -7,6 +7,8 @@
 #                                           `swo-mcp report --watch` at logon)
 #   install-mcp-windows.ps1 -Model NAME     Ollama model to use and pull (default qwen3:8b)
 #   install-mcp-windows.ps1 -NoPull         do not download the model
+#   install-mcp-windows.ps1 -Exe PATH       install a prebuilt swo-mcp.exe (from a release
+#                                           download) instead of building; no Rust needed
 #   install-mcp-windows.ps1 -Uninstall      remove exactly what this script installed
 #
 # Run from anywhere:
@@ -19,20 +21,21 @@
 #
 # Per-user only: no administrator rights, nothing outside your profile. It never touches
 # the desktop app, its cache, or any saved reports (uninstall leaves reports in place).
-# Prerequisites: Rust (MSVC toolchain) and the Microsoft C++ Build Tools, as in
-# docs/windows-build.md.
+# Prerequisites (unless -Exe is given): Rust (MSVC toolchain) and the Microsoft C++
+# Build Tools, as in docs/windows-build.md.
 
 param(
     [switch]$Autostart,
     [switch]$NoPull,
     [switch]$Uninstall,
+    [string]$Exe = "",
     [string]$Model = "qwen3:8b"
 )
 
 $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\swo-mcp"
-$Exe = Join-Path $InstallDir "swo-mcp.exe"
+$Installed = Join-Path $InstallDir "swo-mcp.exe"
 $Launcher = Join-Path $InstallDir "swo-mcp-watch.vbs"
 $Log = Join-Path $InstallDir "swo-mcp.log"
 $TaskName = "SpaceWeatherObservatory swo-mcp report watcher"
@@ -43,7 +46,7 @@ function Stop-Watcher {
     }
     # A running copy would keep the old exe locked. Only stop copies started from our install path.
     Get-Process -Name "swo-mcp" -ErrorAction SilentlyContinue |
-        Where-Object { $_.Path -eq $Exe } |
+        Where-Object { $_.Path -eq $Installed } |
         Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
@@ -63,7 +66,7 @@ if ($Uninstall) {
         Write-Host "not present: scheduled task '$TaskName'"
     }
     # Remove only the files this script creates, by name, and say what happened to each.
-    foreach ($f in @($Exe, $Launcher)) {
+    foreach ($f in @($Installed, $Launcher)) {
         if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f; Write-Host "removed $f" }
         else { Write-Host "not present: $f" }
     }
@@ -76,26 +79,33 @@ if ($Uninstall) {
     exit 0
 }
 
-Write-Host "==> Checking prerequisites"
-if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-    Write-Error "Rust is not installed. Install it from https://rustup.rs (MSVC toolchain; see docs/windows-build.md) and re-run."
-}
-$rustVersion = (rustc --version)
-if ($rustVersion -match "^rustc 1\.(\d+)") {
-    if ([int]$Matches[1] -lt 88) {
-        Write-Error "Rust 1.88 or newer is needed (found $rustVersion). Run: rustup update stable"
+if ($Exe) {
+    if (-not (Test-Path -LiteralPath $Exe)) { Write-Error "No file at -Exe path: $Exe" }
+    $Source = (Resolve-Path -LiteralPath $Exe).Path
+    Write-Host "==> Using prebuilt $Source (skipping the build)"
+} else {
+    Write-Host "==> Checking prerequisites"
+    if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
+        Write-Error "Rust is not installed. Install it from https://rustup.rs (MSVC toolchain; see docs/windows-build.md) and re-run, or pass -Exe with a prebuilt swo-mcp.exe."
     }
+    $rustVersion = (rustc --version)
+    if ($rustVersion -match "^rustc 1\.(\d+)") {
+        if ([int]$Matches[1] -lt 88) {
+            Write-Error "Rust 1.88 or newer is needed (found $rustVersion). Run: rustup update stable"
+        }
+    }
+    Write-Host "ok: $rustVersion"
+
+    Write-Host "==> Building swo-mcp (release)"
+    cargo build --release -p swo-mcp --manifest-path (Join-Path $Repo "Cargo.toml")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $Source = Join-Path $Repo "target\release\swo-mcp.exe"
 }
-Write-Host "ok: $rustVersion"
 
-Write-Host "==> Building swo-mcp (release)"
-cargo build --release -p swo-mcp --manifest-path (Join-Path $Repo "Cargo.toml")
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "==> Installing to $Exe"
+Write-Host "==> Installing to $Installed"
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 Stop-Watcher
-Copy-Item -LiteralPath (Join-Path $Repo "target\release\swo-mcp.exe") -Destination $Exe -Force
+Copy-Item -LiteralPath $Source -Destination $Installed -Force
 
 $entries = Get-UserPathEntries
 if ($entries -notcontains $InstallDir) {
@@ -126,7 +136,7 @@ if ($Autostart) {
     Write-Host "==> Installing the background report updater ('$TaskName')"
     # swo-mcp is a console program; a tiny VBScript launcher runs it with no window
     # and appends its output to the log.
-    $cmd = "cmd /c """"$Exe"" report --watch --model $Model >> ""$Log"" 2>&1"""
+    $cmd = "cmd /c """"$Installed"" report --watch --model $Model >> ""$Log"" 2>&1"""
     $vbs = "CreateObject(""WScript.Shell"").Run """ + $cmd.Replace('"', '""') + """, 0, False"
     Set-Content -LiteralPath $Launcher -Value $vbs -Encoding ASCII
 
@@ -142,10 +152,10 @@ if ($Autostart) {
 }
 
 $reports = Join-Path $env:APPDATA "SpaceWeatherObservatory\reports"
-$exeJson = $Exe.Replace("\", "\\")
+$exeJson = $Installed.Replace("\", "\\")
 Write-Host @"
 
-Installed: $Exe
+Installed: $Installed
 Reports:   $reports\latest.md
 
 Try it (open the Space Weather Observatory app first so the data is fresh):

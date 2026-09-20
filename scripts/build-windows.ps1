@@ -46,6 +46,12 @@ if (-not (Test-Path $bundleDir)) {
     exit 1
 }
 
+Write-Host "==> cargo build --release -p swo-mcp (optional MCP server / local-LLM report writer)"
+cargo build --release -p swo-mcp
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+# Beside the installer, so it is checksummed and uploaded with it.
+Copy-Item "target/release/swo-mcp.exe" (Join-Path $bundleDir "swo-mcp.exe") -Force
+
 Write-Host "==> SHA-256 checksums"
 $sumsFile = Join-Path $bundleDir "SHA256SUMS.txt"
 Get-ChildItem "$bundleDir/*.exe" | ForEach-Object {
@@ -58,6 +64,7 @@ Write-Host "Done. Artifacts:"
 Write-Host "  Installer: $bundleDir\*.exe"
 Write-Host "  Checksums: $sumsFile"
 Write-Host "  Raw exe:   target\release\space-weather-observatory.exe"
+Write-Host "  MCP server: $bundleDir\swo-mcp.exe (install with scripts\install-mcp-windows.ps1 -Exe <path>)"
 Write-Host ""
 Write-Host "Unsigned build: Windows SmartScreen will warn on first run (expected)." -ForegroundColor Yellow
 Write-Host "See docs/windows-build.md for signing and the clean-machine test checklist."
