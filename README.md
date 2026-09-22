@@ -113,7 +113,7 @@ then update the date in `docs/sources.md`.
 | Path | Purpose |
 |---|---|
 | `crates/swo-core/` | Pure scientific core: parsers, model, time alignment, aggregation, flux class, alert state machine, interpretation rules, export. No I/O. |
-| `crates/swo-mcp/` | Optional MCP server over the cache, read-only: dashboard, Kp, flare, interpretation and explanation tools, saved plain-language reports, and a built-in Ollama driver (`report`, `ask`). Separate process. |
+| `crates/swo-mcp/` | Optional MCP server over the cache, read-only: dashboard, Kp, flare, interpretation and explanation tools, saved plain-language reports, a terminal `status` rollup, and a built-in Ollama driver (`report`, `ask`). Separate process. |
 | `src-tauri/` | Desktop backend: allow-listed acquisition, SQLite cache, snapshot assembly, commands, imagery, demo dataset, lessons. |
 | `src/` | Frontend: shell, chart engine, alert banner, aurora, learn, sources. |
 | `fixtures/captured/` | Verbatim NOAA originals (2026-09-06T18:04Z; solar cycle products 2026-09-17) used by tests and as the frozen demo dataset. |

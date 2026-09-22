@@ -22,6 +22,8 @@ cargo build --release -p swo-mcp
 swo-mcp report                      # write the report if the saved one is out of date, print it
 swo-mcp report --watch              # stay running; rewrite whenever the data changes (checks every 300 s)
 swo-mcp ask "What does Bz mean, and is today's value unusual?"
+swo-mcp status                      # one-screen text rollup of the latest readings and bulletins (no model)
+swo-mcp status --watch 60           # stay running; reprint whenever the cache changes
 swo-mcp dashboard                   # the readings the model is given, as JSON
 swo-mcp register                    # add the server to Claude Desktop / Claude Code
 ```

@@ -22,6 +22,7 @@ commands:
   serve                 run the MCP server on stdio (default)
   report                have the local model write the plain-language report, if out of date
   ask \"QUESTION\"        ask the local model about the dashboard or any reading
+  status                print a one-screen text rollup of the latest space weather
   dashboard             print the current dashboard readings as JSON
   register [CLIENT]     add this server to an MCP client: claude-desktop, claude-code,
                         or all (default: every client found on this machine)
@@ -33,6 +34,7 @@ options:
   --model NAME          Ollama model (default: env SWO_MODEL, else picked from installed models)
   --watch [SECONDS]     report: keep running and rewrite the report whenever the data
                         changes or it grows stale (checks every 300 s by default)
+                        status: keep running and reprint whenever the data changes
   --force               report: rewrite even if the saved report is current
   -h, --help            show this help
 
@@ -246,6 +248,24 @@ async fn run() -> Result<(), String> {
                 .waiting()
                 .await
                 .map_err(|e| format!("MCP server stopped: {e}"))?;
+        }
+        "status" => {
+            let mut last_fingerprint = String::new();
+            loop {
+                let d = server.dashboard()?;
+                if d.data_fingerprint != last_fingerprint {
+                    last_fingerprint = d.data_fingerprint.clone();
+                    print!("{}", swo_mcp::status::render(&d));
+                    if args.watch.is_some() {
+                        println!("(watching; Ctrl-C to stop)");
+                    }
+                }
+                let Some(secs) = args.watch else { break };
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(secs)) => {}
+                    _ = tokio::signal::ctrl_c() => break,
+                }
+            }
         }
         "dashboard" => {
             let json =

@@ -94,6 +94,7 @@ pick: [`docs/local-llm-quickstart.md`](docs/local-llm-quickstart.md). The short 
 
 ```bash
 scripts/install-mcp-macos.sh          # Windows: scripts\install-mcp-windows.ps1
+swo-mcp status                        # latest readings and bulletins in your terminal, no model needed
 swo-mcp report
 swo-mcp ask "What does Kp mean?"
 ```

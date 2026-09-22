@@ -155,6 +155,14 @@ swo-mcp ask "Have there been any solar flares in the last day?"
 The model looks up a reviewed explanation and the current value before answering, rather
 than explaining from memory.
 
+**Just the numbers, no model** (a one-screen rollup of the latest readings, statements and
+NOAA bulletins from the cache; add `--watch` to keep it on screen and reprint on every change):
+
+```bash
+swo-mcp status
+swo-mcp status --watch 60
+```
+
 **Where the reports are**
 
 | | |

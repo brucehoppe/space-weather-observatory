@@ -719,3 +719,63 @@ async fn a_server_started_before_the_cache_exists_explains_itself_then_recovers(
         .unwrap();
     assert!(server.get_dashboard().await.unwrap().0.solar_wind.is_some());
 }
+
+// ---------------------------------------------------------------- status rollup
+
+#[test]
+fn status_rolls_up_the_latest_readings_on_one_screen() {
+    let d = full_server().dashboard().unwrap();
+    let out = swo_mcp::status::render(&d);
+    // Header with the clock and data age.
+    assert!(out.contains("status at 2026-09-06 18:30 UTC"), "{out}");
+    assert!(out.contains("data 26 minutes old"), "{out}");
+    // The NOW line: scales, Kp, wind, Bz, X-ray, all from the fixture.
+    assert!(out.contains("G0 / R0 / S0"), "{out}");
+    assert!(out.contains("Kp 1.33 (NOAA estimate, quiet)"), "{out}");
+    assert!(out.contains("Wind 346 km/s"), "{out}");
+    assert!(out.contains("Bz -0.3 nT"), "{out}");
+    assert!(out.contains("X-ray B3.7 (24 h peak C5.1)"), "{out}");
+    // Outlook: NOAA's three days, with the scale where NOAA printed one.
+    assert!(out.contains("2026-09-08 Kp 4.67 (G1)"), "{out}");
+    // The app's own statements, with their basis.
+    assert!(
+        out.contains("NOAA forecasts G1 conditions are possible for 8 September"),
+        "{out}"
+    );
+    assert!(out.contains("[NOAA SWPC forecast]"), "{out}");
+    // Bulletins: count, status, scale, headline, issue time.
+    assert!(out.contains("1 active, 3 issued in the last 24 h"), "{out}");
+    assert!(
+        out.contains("12:12  active  G1  WATCH: Geomagnetic Storm Category G1 Predicted"),
+        "{out}"
+    );
+    assert!(
+        out.contains("11:55  issued  S1  SUMMARY: Proton Event 10MeV"),
+        "{out}"
+    );
+    assert!(!out.contains("STALE"), "{out}");
+    assert!(out.contains("fingerprint ecfb7cf8b5b89bae"), "{out}");
+}
+
+#[test]
+fn status_warns_loudly_when_the_cache_is_stale() {
+    let server = SwoServer::from_connection(full_cache())
+        .unwrap()
+        .with_fixed_now(t("2026-09-08T18:04:00Z"));
+    let out = swo_mcp::status::render(&server.dashboard().unwrap());
+    assert!(out.contains("STALE DATA"), "{out}");
+    assert!(out.contains("2 days"), "{out}");
+}
+
+#[test]
+fn status_names_missing_panels_instead_of_implying_quiet() {
+    // Only solar wind is cached: every other panel must be listed as unavailable.
+    let out = swo_mcp::status::render(&server().dashboard().unwrap());
+    assert!(out.contains("Wind 346 km/s"), "{out}");
+    assert!(out.contains("UNAVAILABLE"), "{out}");
+    assert!(
+        out.contains("planetary_k_index: not in the cache yet"),
+        "{out}"
+    );
+    assert!(!out.contains("G0 / R0 / S0"), "{out}");
+}

@@ -18,6 +18,7 @@ pub mod ollama;
 pub mod prompts;
 pub mod register;
 pub mod reports;
+pub mod status;
 
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use rmcp::{
